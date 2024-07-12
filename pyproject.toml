@@ -1,7 +1,13 @@
 [project]
 name = "cluster_wrapper"
 version = "0.1"
-dependencies = ["pydantic", "htcondor", "pyyaml", "paramiko"]
+dependencies = [
+    "htcondor",
+    "paramiko",
+    "pydantic",
+    "pyyaml",
+    "structlog",
+]
 
 [project.scripts]
 cluster-wrapper = "cluster_wrapper:main"
