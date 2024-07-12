@@ -6,6 +6,7 @@ dependencies = [
     "paramiko",
     "pydantic",
     "pyyaml",
+    "pyzmq",
     "structlog",
 ]
 
