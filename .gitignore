@@ -1,0 +1,12 @@
+# python tmp files
+__pycache__/
+*.egg-info/
+*.egg
+
+# virtual environment
+ve/
+
+# emacs tmp files
+*.~undo-tree~
+**/#*#
+**/.#*
