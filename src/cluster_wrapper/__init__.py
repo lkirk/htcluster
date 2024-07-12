@@ -11,55 +11,6 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 SIZE_PAT = re.compile("[0-9]+(K|M|G|T)(B)?")
 
-# class FileGlob:
-#     def __init__(self, dir: Path | str, glob: str, sort: Optional[Callable] = None):
-#         dir = Path(dir)
-#         self._val = [{"path": p} for p in sorted(dir.glob(glob), key=sort)]
-#         assert len(self._val) > 0, f"no files were found in glob {dir / glob}"
-
-#     @classmethod
-#     def yaml_constructor(cls, loader, node):
-#         return FileGlob(**loader.construct_mapping(node))
-
-# yaml.SafeLoader.add_constructor(u'!glob', FileGlob.yaml_constructor)
-
-
-# class Range:
-#     def __init__(
-#         self,
-#         start: Optional[int] = None,
-#         stop: Optional[int] = None,
-#         step: Optional[int] = None,
-#         dtype: Optional[npt.DTypeLike] = None,
-#     ):
-#         if stop is None:
-#             raise ValueError("stop must be specified")
-#         if start is None:
-#             self._val = np.arange(stop)
-#         if step is None:
-#             self._val = np.arange(start, stop)
-#         self._val = np.arange(start, stop, step)
-#         if dtype is not None:
-#             self._val = self._val.astype(dtype)
-
-
-# class LinSpace:
-#     def __init__(
-#         self,
-#         start: int | float,
-#         stop: int | float,
-#         num: int,
-#         dtype: Optional[npt.DTypeLike] = None,
-#     ):
-#         self._val = np.linspace(start, stop, num)
-#         if dtype is not None:
-#             self._val = self._val.astype(dtype)
-
-
-# class Repeat:
-#     def __init__(self, val: int | float | str, n: int):
-#         self._val = [val] * n
-
 
 def yaml_glob(loader, node):
     try:
