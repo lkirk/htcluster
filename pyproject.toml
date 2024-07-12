@@ -1,0 +1,14 @@
+[project]
+name = "cluster_wrapper"
+version = "0.1"
+dependencies = ["pydantic", "htcondor", "pyyaml", "paramiko"]
+
+[project.scripts]
+cluster-wrapper = "cluster_wrapper:main"
+
+[tool.isort]
+profile = "black"
+
+[tool.pyright]
+venvPath = "/home/lkirk/repo/cluster-wrapper"
+venv = "ve"
