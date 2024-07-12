@@ -10,7 +10,8 @@ dependencies = [
 ]
 
 [project.scripts]
-cluster-wrapper = "cluster_wrapper:main"
+prep-cluster-job = "job_prep:main"
+htcluster-server = "job_exec.server:main"
 
 [tool.isort]
 profile = "black"
