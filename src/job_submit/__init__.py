@@ -61,7 +61,7 @@ def get_per_job_params(
                 params.append(
                     JobArgs(
                         in_files=Path(cj.params.in_files[j].name),
-                        out_files=out_files[j],
+                        out_files=Path(out_files[j].name),
                         params={k: cj.params.params[k][j] for k in cj.params.params},
                     )
                 )
@@ -71,12 +71,17 @@ def get_per_job_params(
                 params.append(
                     JobArgs(
                         params={k: cj.params.params[k][j] for k in cj.params.params},
-                        out_files=out_files[j],
+                        out_files=Path(out_files[j].name),
                     )
                 )
         case (True, False):
             for j in range(cj.n_jobs):
-                params.append(JobArgs(in_files=input_dir / cj.params.in_files[j].name))
+                params.append(
+                    JobArgs(
+                        in_files=input_dir / cj.params.in_files[j].name,
+                        out_files=Path(out_files[j].name),
+                    )
+                )
 
     return params
 
