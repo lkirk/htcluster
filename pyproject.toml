@@ -1,8 +1,9 @@
 [project]
-name = "cluster_wrapper"
+name = "htcluster"
 version = "0.1"
 dependencies = [
     "htcondor",
+    "numpy",
     "paramiko",
     "pydantic",
     "pyyaml",
@@ -11,12 +12,12 @@ dependencies = [
 ]
 
 [project.scripts]
-prep-cluster-job = "job_prep:main"
+htcluster-submit = "job_submit:main"
 htcluster-server = "job_exec.server:main"
 
 [tool.isort]
 profile = "black"
 
 [tool.pyright]
-venvPath = "/home/lkirk/repo/cluster-wrapper"
+venvPath = "."
 venv = "ve"
