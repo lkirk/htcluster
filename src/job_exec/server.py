@@ -132,7 +132,9 @@ def main():
             sub, itemdata = make_submission(m)
             LOG.info(f"submitting {sub}")
             if args.dry_run is False:
-                schedd = htcondor.Schedd(htcondor.Submit(sub), itemdata=itemdata)
+                submission = htcondor.Submit(sub)
+                submission.issue_credentials()
+                schedd = htcondor.Schedd(submission, itemdata=itemdata)
                 import IPython
 
                 IPython.embed()
