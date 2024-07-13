@@ -1,7 +1,7 @@
 from importlib import import_module
 
 import structlog
-from htcluster.validators import JobArgs
+from htcluster.validators_3_9_compat import JobArgs
 
 
 import argparse
