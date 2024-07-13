@@ -7,7 +7,7 @@ import zmq
 from htcondor import htcondor
 from pydantic import ValidationError
 
-from htcluster.validators import RunnerPayload
+from htcluster.validators_3_9_compat import RunnerPayload
 
 LOG = structlog.get_logger()
 

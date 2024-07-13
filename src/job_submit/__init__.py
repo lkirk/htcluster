@@ -3,13 +3,8 @@ import gzip
 import re
 from pathlib import Path
 
-from htcluster.validators import (
-    ClusterJob,
-    ImplicitOut,
-    JobArgs,
-    ProgrammaticJobParams,
-    RunnerPayload,
-)
+from htcluster.validators import ClusterJob, ImplicitOut, ProgrammaticJobParams
+from htcluster.validators_3_9_compat import JobArgs, RunnerPayload
 
 from .ssh import chtc_ssh_client, copy_file, mkdir
 from .yaml import read_and_validate_job_yaml
