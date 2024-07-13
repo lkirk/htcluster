@@ -14,6 +14,7 @@ dependencies = [
 [project.scripts]
 htcluster-submit = "job_submit:main"
 htcluster-server = "job_exec.server:main"
+htcluster-wrapper = "job_wrapper:main"
 
 [tool.isort]
 profile = "black"

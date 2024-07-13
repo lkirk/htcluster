@@ -16,7 +16,7 @@ def parse_args():
 
 def main():
     cli_args = parse_args()
-    log = structlog.get_logger()
+    log = structlog.get_logger("wrapper")
     log.info(f"starting")
 
     args = JobArgs.model_validate_json(cli_args.json_args)
