@@ -1,10 +1,20 @@
+import sys
+
+# import from cluster htcondor build if we can
+sys.path.insert(0, "/usr/lib64/python3.9/site-packages")
+
+try:
+    import htcondor2 as htcondor
+except ModuleNotFoundError:
+    # the htcondor wheel is broken for classad2
+    from htcondor import htcondor
+
 import argparse
 import gzip
 from typing import Any, Optional
 
 import structlog
 import zmq
-from htcondor import htcondor
 from pydantic import ValidationError
 
 from htcluster.validators_3_9_compat import RunnerPayload
@@ -56,36 +66,29 @@ def parse_message(raw_message) -> Optional[RunnerPayload]:
     return payload
 
 
-BASE_SUBMISSION = {
-    "universe": "docker",
-    "docker_pull_policy": "always",
-    "output": "$(OutputDir)/logs/out/$(Process).log",
-    "error": "$(OutputDir)/logs/err/$(Process).log",
-    "log": "$(Cluster).log",
-}
-
-
 def make_submission(
     payload: RunnerPayload,
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
-    # TODO: job name?
-    itemdata: list[dict[str, str]] = []
-    sub: dict[str, Any] = BASE_SUBMISSION.copy()
+    itemdata = []
+    sub = {
+        "universe": "docker",
+        "docker_pull_policy": "always",
+        "JobBatchName": payload.job.name,
+        "docker_image": payload.job.docker_image,
+        "request_memory": payload.job.memory,
+        "request_cpus": payload.job.cpus,
+        "request_disk": payload.job.disk,
+        "arguments": f"{payload.job.entrypoint} '$(job_json)'",
+        "output": payload.log_dir / "logs/out/$(Process).log",
+        "error": payload.log_dir / "logs/err/$(Process).log",
+        "log": payload.log_dir / "cluster.log",
+    }
 
     if payload.job.classads is not None:
         sub.update({"requirements": payload.job.classads})
 
-    sub.update(
-        {
-            "JobBatchName": payload.job.name,
-            "request_memory": payload.job.memory,
-            "request_cpus": payload.job.cpus,
-            "request_disk": payload.job.disk,
-            "arguments": f"{payload.job.entrypoint} '$(job_json)'",
-        }
-    )
     for p in payload.params:
-        itemdata.append({"job_json": p.model_dump_json()})
+        itemdata.append({"job_json": p.model_dump_json().replace('"', r"\"")})
 
     if len(payload.in_files) > 0:
         sub.update({"transfer_input_files": "$(in_file)"})
@@ -98,7 +101,7 @@ def make_submission(
                 "should_transfer_files": "YES",
                 "transfer_output_files": "ON_EXIT",
                 "transfer_output_files": "$(job_out_file)",
-                "transfer_output_remaps": "$(job_out_file) = $(out_file)",
+                "transfer_output_remaps": '"$(job_out_file) = $(out_file)"',
             }
         )
         for j in range(len(payload.params)):
@@ -134,7 +137,9 @@ def main():
             if args.dry_run is False:
                 submission = htcondor.Submit(sub)
                 submission.issue_credentials()
-                schedd = htcondor.Schedd(submission, itemdata=itemdata)
+
+                schedd = htcondor.Schedd()
+                result = schedd.submit(submission, itemdata=iter(itemdata))
                 import IPython
 
                 IPython.embed()

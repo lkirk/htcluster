@@ -39,6 +39,7 @@ class JobArgs(BaseModel):
 class RunnerPayload(BaseModel):
     job: JobSettings
     out_dir: Path
+    log_dir: Path
     params: list[JobArgs]
     in_files: list[Path]
     out_files: list[Path]

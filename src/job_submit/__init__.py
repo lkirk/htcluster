@@ -1,10 +1,10 @@
 import argparse
-import gzip
 import re
 from pathlib import Path
 
 from htcluster.validators import ClusterJob, ImplicitOut, ProgrammaticJobParams
 from htcluster.validators_3_9_compat import JobArgs, RunnerPayload
+from job_exec.client import connect_remote, connect_local, send
 
 from .ssh import chtc_ssh_client, copy_file, mkdir
 from .yaml import read_and_validate_job_yaml
@@ -18,6 +18,11 @@ def parse_args() -> argparse.Namespace:
         "-d",
         action="store_true",
         help="do not perform any actions, just gather data and validate inputs",
+    )
+    parser.add_argument(
+        "--test-local",
+        action="store_true",
+        help="test against a local server instance, do not use ssh",
     )
     return parser.parse_args()
 
@@ -95,6 +100,7 @@ def main():
     job_dir = cluster_dir / job_descr.job.name
     input_dir = job_dir / "inputs"
     output_dir = job_dir / "outputs"
+    log_dir=job_dir / "logs"
 
     assert isinstance(job_descr.params, ProgrammaticJobParams)
     if isinstance(job_descr.params.out_files, ImplicitOut):
@@ -106,6 +112,7 @@ def main():
     runner_payload = RunnerPayload(
         job=job_descr.job,
         out_dir=output_dir,
+        log_dir=log_dir,
         params=job_params,
         out_files=out_files,
         in_files=job_descr.params.in_files,
@@ -115,6 +122,8 @@ def main():
         with client.open_sftp() as sftp:
             mkdir(sftp, job_dir)
             mkdir(sftp, input_dir)
+            mkdir(sftp, output_dir)
+            mkdir(sftp, log_dir)
             assert isinstance(job_descr.params, ProgrammaticJobParams)  # mypy
             for j, params in enumerate(runner_payload.params):
                 if (
@@ -124,15 +133,20 @@ def main():
                     copy_file(
                         sftp,
                         job_descr.params.in_files[j],
-                        params.in_files,
+                        input_dir / params.in_files,
                     )
                     print(f"copied {job_descr.params.in_files[j]}")
-    else:
-        import IPython
 
-        IPython.embed()
-        raise Exception
-        print(runner_payload.model_dump_json(indent=2))
+        # TODO: config
+        socket = connect_remote(5555, "lkirk2", "ap2002.chtc.wisc.edu")
+        send(socket, runner_payload)
+    else:
+        if args.test_local:
+            # TODO: config
+            socket = connect_local(5555)
+            send(socket, runner_payload)
+        else:
+            print(runner_payload.model_dump_json(indent=2))
 
         # write_file(
         #     sftp,
