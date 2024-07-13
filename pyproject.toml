@@ -11,6 +11,9 @@ dependencies = [
     "structlog",
 ]
 
+[project.optional-dependencies]
+dev = ["ipython"]
+
 [project.scripts]
 htcluster-submit = "job_submit:main"
 htcluster-server = "job_exec.server:main"
