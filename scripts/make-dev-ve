@@ -2,3 +2,4 @@
 
 python -m venv ve
 ve/bin/pip install -e .
+ve/bin/pip install ipython
