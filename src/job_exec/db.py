@@ -66,7 +66,7 @@ def schema(con: sqlite3.Connection) -> None:
                    cluster_id INTEGER PRIMARY KEY,
                    num_procs INTEGER,
                    job_name TEXT,
-                   submitted_on DATE,
+                   submitted_on TIMESTAMP,
                    submitted_on_tz STRING,
                    FOREIGN KEY(cluster_id) REFERENCES job_classads(cluster_id)
             ) WITHOUT ROWID
@@ -124,7 +124,8 @@ def write_submission_data(
     try:
         with con:
             con.execute(
-                f"INSERT INTO job_classads VALUES ({', '.join(['?'] * len(job_classads))})"
+                f"INSERT INTO job_classads VALUES ({', '.join(['?'] * len(job_classads))})",
+                job_classads,
             )
             con.execute(
                 """UPDATE jobs AS j
@@ -134,7 +135,7 @@ def write_submission_data(
                 """
             )
             con.executemany(
-                f"INSERT INTO jobs VALUES {', '.join(['?'] * len(jobs))}", jobs
+                f"INSERT INTO jobs VALUES ({', '.join(['?'] * len(jobs))})", jobs
             )
             con.execute(
                 """UPDATE procs AS p
@@ -144,7 +145,7 @@ def write_submission_data(
                 """
             )
             con.executemany(
-                f"INSERT INTO procs VALUES {', '.join(['?'] * len(procs))}", procs
+                f"INSERT INTO procs VALUES ({', '.join(['?'] * len(procs))})", procs
             )
     except sqlite3.IntegrityError as e:
         LOG.exception(e)
