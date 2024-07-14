@@ -122,7 +122,7 @@ def main():
     if not args.dry_run:
         client = chtc_ssh_client()
         with client.open_sftp() as sftp:
-            mkdir(sftp, job_dir / job_dir)
+            mkdir(sftp, job_dir)
             mkdir(sftp, job_dir / input_dir)
             mkdir(sftp, job_dir / output_dir)
             mkdir(sftp, job_dir / log_dir)

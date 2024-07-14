@@ -11,6 +11,7 @@ except ModuleNotFoundError:
 
 import argparse
 import gzip
+from pathlib import Path
 from typing import Any, Optional
 
 import structlog
@@ -73,7 +74,7 @@ def make_submission(
     sub = {
         "universe": "docker",
         "docker_pull_policy": "always",
-        "initialdir": payload.job_dir,
+        "initialdir": Path("~").expanduser() / payload.job_dir,
         "JobBatchName": payload.job.name,
         "docker_image": payload.job.docker_image,
         "request_memory": payload.job.memory,
