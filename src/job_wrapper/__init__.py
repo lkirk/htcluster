@@ -24,7 +24,11 @@ def main():
     module, function = cli_args.module.split(":")
     entrypoint = getattr(import_module(module), function)
 
-    log.info("running job", entrypoint=cli_args.module, args=args.model_dump())
+    log.info(
+        "running job",
+        entrypoint=cli_args.module,
+        args={k: str(v) for k, v in args.model_dump().items()},
+    )
     entrypoint(args)
 
 
