@@ -55,7 +55,7 @@ def parse_args():
     parser.add_argument(
         "--db-path",
         type=Path,
-        default=Path("~/.config/var").expanduser()
+        default=Path("~/.local/var/job_exec.db").expanduser()
     )
     return parser.parse_args()
 
