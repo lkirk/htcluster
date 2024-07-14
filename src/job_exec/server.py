@@ -21,7 +21,6 @@ from pydantic import ValidationError
 import job_exec.db as db
 from htcluster.validators_3_9_compat import RunnerPayload
 
-structlog.configure(logger_factory=structlog.PrintLoggerFactory(sys.stderr))
 LOG = structlog.get_logger()
 
 

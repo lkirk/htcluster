@@ -1,11 +1,10 @@
 import argparse
 from importlib import import_module
-import sys
 
 import structlog
-from htcluster.validators_3_9_compat import JobArgs
 
-structlog.configure(logger_factory=structlog.PrintLoggerFactory(sys.stderr))
+from htcluster.logging import log_config
+from htcluster.validators_3_9_compat import JobArgs
 
 
 def parse_args():
@@ -17,6 +16,7 @@ def parse_args():
 
 def main():
     cli_args = parse_args()
+    log_config()
     log = structlog.get_logger(module="job_wrapper")
     log.info("starting")
 
