@@ -1,6 +1,9 @@
 import argparse
 import re
+import sys
 from pathlib import Path
+
+import structlog
 
 from htcluster.validators import ClusterJob, ImplicitOut, ProgrammaticJobParams
 from htcluster.validators_3_9_compat import JobArgs, RunnerPayload
@@ -9,6 +12,8 @@ from job_exec.client import connect_local, connect_remote, send
 from .github import get_most_recent_container_hash
 from .ssh import chtc_ssh_client, copy_file, mkdir
 from .yaml import read_and_validate_job_yaml
+
+structlog.configure(logger_factory=structlog.PrintLoggerFactory(sys.stderr))
 
 
 def parse_args() -> argparse.Namespace:

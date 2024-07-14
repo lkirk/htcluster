@@ -19,9 +19,9 @@ import zmq
 from pydantic import ValidationError
 
 import job_exec.db as db
-
 from htcluster.validators_3_9_compat import RunnerPayload
 
+structlog.configure(logger_factory=structlog.PrintLoggerFactory(sys.stderr))
 LOG = structlog.get_logger()
 
 
@@ -53,9 +53,7 @@ def parse_args():
         help="do not perform any actions, just gather data and validate inputs",
     )
     parser.add_argument(
-        "--db-path",
-        type=Path,
-        default=Path("~/.local/var/job_exec.db").expanduser()
+        "--db-path", type=Path, default=Path("~/.local/var/job_exec.db").expanduser()
     )
     return parser.parse_args()
 

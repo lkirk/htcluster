@@ -1,10 +1,11 @@
+import argparse
 from importlib import import_module
+import sys
 
 import structlog
 from htcluster.validators_3_9_compat import JobArgs
 
-
-import argparse
+structlog.configure(logger_factory=structlog.PrintLoggerFactory(sys.stderr))
 
 
 def parse_args():
@@ -16,8 +17,8 @@ def parse_args():
 
 def main():
     cli_args = parse_args()
-    log = structlog.get_logger("wrapper")
-    log.info(f"starting")
+    log = structlog.get_logger(module="job_wrapper")
+    log.info("starting")
 
     args = JobArgs.model_validate_json(cli_args.json_args)
 
