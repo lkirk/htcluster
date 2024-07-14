@@ -73,6 +73,7 @@ def make_submission(
     sub = {
         "universe": "docker",
         "docker_pull_policy": "always",
+        "initialdir": payload.job_dir,
         "JobBatchName": payload.job.name,
         "docker_image": payload.job.docker_image,
         "request_memory": payload.job.memory,

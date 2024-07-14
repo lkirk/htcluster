@@ -4,7 +4,7 @@ from pathlib import Path
 
 from htcluster.validators import ClusterJob, ImplicitOut, ProgrammaticJobParams
 from htcluster.validators_3_9_compat import JobArgs, RunnerPayload
-from job_exec.client import connect_remote, connect_local, send
+from job_exec.client import connect_local, connect_remote, send
 
 from .ssh import chtc_ssh_client, copy_file, mkdir
 from .yaml import read_and_validate_job_yaml
@@ -98,9 +98,9 @@ def main():
         raise ValueError(f"{args.job_yaml} does not exist")
     job_descr = read_and_validate_job_yaml(args.job_yaml)
     job_dir = cluster_dir / job_descr.job.name
-    input_dir = job_dir / "inputs"
-    output_dir = job_dir / "outputs"
-    log_dir=job_dir / "logs"
+    input_dir = Path("inputs")
+    output_dir = Path("outputs")
+    log_dir = Path("logs")
 
     assert isinstance(job_descr.params, ProgrammaticJobParams)
     if isinstance(job_descr.params.out_files, ImplicitOut):
@@ -111,19 +111,21 @@ def main():
 
     runner_payload = RunnerPayload(
         job=job_descr.job,
+        job_dir=job_dir,
         out_dir=output_dir,
         log_dir=log_dir,
         params=job_params,
         out_files=out_files,
-        in_files=job_descr.params.in_files,
+        in_files=[input_dir / f.name for f in job_descr.params.in_files],
     )
+
     if not args.dry_run:
         client = chtc_ssh_client()
         with client.open_sftp() as sftp:
-            mkdir(sftp, job_dir)
-            mkdir(sftp, input_dir)
-            mkdir(sftp, output_dir)
-            mkdir(sftp, log_dir)
+            mkdir(sftp, job_dir / job_dir)
+            mkdir(sftp, job_dir / input_dir)
+            mkdir(sftp, job_dir / output_dir)
+            mkdir(sftp, job_dir / log_dir)
             assert isinstance(job_descr.params, ProgrammaticJobParams)  # mypy
             for j, params in enumerate(runner_payload.params):
                 if (
@@ -133,7 +135,7 @@ def main():
                     copy_file(
                         sftp,
                         job_descr.params.in_files[j],
-                        input_dir / params.in_files,
+                        job_dir / input_dir / params.in_files,
                     )
                     print(f"copied {job_descr.params.in_files[j]}")
 
