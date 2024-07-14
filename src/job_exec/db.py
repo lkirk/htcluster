@@ -40,9 +40,6 @@ ADS = [
 ]
 
 
-def prepare_classads(): ...
-
-
 def schema(con: sqlite3.Connection) -> None:
     with con:
         con.execute(
@@ -114,8 +111,8 @@ def write_submission_data(
         submit_result.cluster(),
         submit_result.num_procs(),
         params.job.name,
-        local_timezone,
         submit_time,
+        local_timezone,
     )
     procs = [
         (submit_result.cluster(), str(p.in_files), str(p.out_files), p.params)
