@@ -105,9 +105,9 @@ def main():
     job_descr.job.docker_image = f"{job_descr.job.docker_image}@{container_hash}"
 
     job_dir = cluster_dir / job_descr.job.name
-    input_dir = Path("inputs")
-    output_dir = Path("outputs")
-    log_dir = Path("logs")
+    input_dir = Path("input")
+    output_dir = Path("output")
+    log_dir = Path("log")
 
     assert isinstance(job_descr.params, ProgrammaticJobParams)
     if isinstance(job_descr.params.out_files, ImplicitOut):
