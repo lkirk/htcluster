@@ -42,8 +42,8 @@ class ClusterJob(BaseModel):
         return self
 
     def _validate_prog_job_params(self, jp: ProgrammaticJobParams):
-        match (jp.in_files is None, jp.params is None):
-            case (False, False):
+        match (len(jp.in_files) > 0, jp.params is not None):
+            case (True, True):
                 n_files = len(jp.in_files)
                 self.n_jobs = n_files
                 assert jp.params is not None  # mypy
@@ -51,10 +51,8 @@ class ClusterJob(BaseModel):
                     if (n_params := len(v)) != n_files:
                         raise ValueError(
                             "number of params must match number of files, there are "
-                            f"{n_files} in files and {n_params} params for {k}"
+                            f"{n_files} in_files and {n_params} params for {k}"
                         )
-            case (True, False):
-                self.n_jobs = len(jp.in_files)
             case (False, True):
                 assert jp.params is not None  # mypy
                 first_key = list(jp.params.keys())[0]
@@ -66,7 +64,9 @@ class ClusterJob(BaseModel):
                             f"has {first_len} params whereas {k} has {n_params}"
                         )
                 self.n_jobs = first_len
-            case (True, True):
+            case (True, False):
+                self.n_jobs = len(jp.in_files)
+            case (False, False):
                 raise ValueError("in_files and/or params must be specified in inputs")
 
     # @field_validator(""):
