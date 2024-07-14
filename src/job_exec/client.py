@@ -1,5 +1,4 @@
 import gzip
-from typing import Type
 
 import zmq
 import zmq.ssh

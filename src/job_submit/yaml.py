@@ -100,7 +100,6 @@ def yaml_repeat(loader, node) -> list[str | int | float]:
 
 
 def yaml_implicit_out(loader, node) -> ImplicitOut:
-    params = loader.construct_scalar(node).split()
     raw = node.value.split()
     if len(raw) > 1:
         raise ValueError(f"!implicit_out: expect 1 arguments, got {raw}")
