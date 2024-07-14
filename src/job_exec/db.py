@@ -84,7 +84,7 @@ def schema(con: sqlite3.Connection) -> None:
             "CREATE UNIQUE INDEX job_classads_cluster_id ON job_classads(cluster_id)"
         )
         con.execute("CREATE UNIQUE INDEX jobs_cluster_id ON jobs(cluster_id)")
-        con.execute("CREATE UNIQUE INDEX procs_cluster_id ON procs(cluster_id)")
+        con.execute("CREATE INDEX procs_cluster_id ON procs(cluster_id)")
 
 
 def connect(db: Path) -> sqlite3.Connection:
@@ -115,7 +115,7 @@ def write_submission_data(
         local_timezone,
     )
     procs = [
-        (submit_result.cluster(), str(p.in_files), str(p.out_files), p.params)
+        (submit_result.cluster(), str(p.in_files), str(p.out_files), p.model_dump_json())
         for p in params.params
     ]
     try:
@@ -131,7 +131,7 @@ def write_submission_data(
                        WHERE j.cluster_id = c.cluster_id
                 """
             )
-            con.executemany(
+            con.execute(
                 f"INSERT INTO jobs VALUES ({', '.join(['?'] * len(jobs))})", jobs
             )
             con.execute(
@@ -142,7 +142,7 @@ def write_submission_data(
                 """
             )
             con.executemany(
-                f"INSERT INTO procs VALUES ({', '.join(['?'] * len(procs))})", procs
+                f"INSERT INTO procs VALUES ({', '.join(['?'] * len(procs[0]))})", procs
             )
     except sqlite3.IntegrityError as e:
         LOG.exception(e)
