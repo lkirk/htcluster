@@ -26,6 +26,7 @@ dev = ["ipython"]
 htcluster-submit = "job_submit:main"
 htcluster-server = "job_exec.server:main"
 htcluster-wrapper = "job_wrapper:main"
+get-container-hash = "scripts.get_container_hash:main"
 
 [tool.isort]
 profile = "black"
