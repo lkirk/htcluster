@@ -1,0 +1,8 @@
+[Unit]
+Description=Daemon that listens for cluster submission requests
+
+[Service]
+ExecStart=%h/.venv/htcluster/bin/htcluster-server
+
+[Install]
+WantedBy=default.target
