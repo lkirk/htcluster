@@ -59,7 +59,7 @@ def connect(db: Path) -> sqlite3.Connection:
     if not db.exists():
         LOG.info("database does not exist, writing schema", db=str(db))
         write_schema = True
-    con = sqlite3.connect(db, autocommit=False)
+    con = sqlite3.connect(db)
     con.execute("PRAGMA foreign_keys = ON")
     if write_schema:
         schema(con)
