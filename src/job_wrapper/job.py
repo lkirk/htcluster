@@ -1,6 +1,5 @@
 from functools import wraps
 
-
 from htcluster.logging import log_config
 
 
@@ -20,7 +19,11 @@ def job_wrapper(schema):
         @wraps(func)
         def wrapper(job_params):
             log_config()
-            valid_job_params = schema(**job_params)
+            # load the validated JobArgs with (presumably) narrower types specified
+            # in the job workflow entrypoint
+            valid_job_params = schema.model_validate(job_params, from_attributes=True)
             return func(valid_job_params)
+
         return wrapper
+
     return inner
