@@ -2,7 +2,7 @@
 Description=Daemon that listens for cluster submission requests
 
 [Service]
-ExecStart=bash -c "%h/.venv/htcluster/bin/htcluster-server >> %h/.local/var/htcluster-server.log"
+ExecStart=bash -c "%h/.venv/htcluster/bin/htcluster-server --json-logging >> %h/.local/var/htcluster-server.log"
 
 [Install]
 WantedBy=default.target
