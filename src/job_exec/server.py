@@ -130,12 +130,11 @@ def main():
     if args.json_logging:
         structlog.configure(processors=[structlog.processors.JSONRenderer()])
 
-    if not args.dry_run:
-        if not (db_parent := args.db_path.parent).exists():
-            LOG.info("db path does not exist, creating", path=str(db_parent))
-            db_parent.mkdir(parents=True)
+    if not (db_parent := args.db_path.parent).exists():
+        LOG.info("db path does not exist, creating", path=str(db_parent))
+        db_parent.mkdir(parents=True)
 
-        job_db = db.connect(args.db_path)
+    job_db = db.connect(args.db_path)
 
     context = zmq.Context()
     socket = context.socket(zmq.REP)
@@ -156,11 +155,10 @@ def main():
 
                 schedd = htcondor.Schedd()
                 result = schedd.submit(submission, itemdata=iter(itemdata))
-                import IPython
-
-                IPython.embed()
+                db.write_submission_data(job_db, result, m)
+                LOG.info("wrote job data to db", db=str(args.db_path))
             else:
-                LOG.info(f"itemdata {itemdata}")
+                LOG.info(itemdata=itemdata)
 
 
 if __name__ == "__main__":
