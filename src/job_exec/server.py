@@ -18,6 +18,8 @@ import structlog
 import zmq
 from pydantic import ValidationError
 
+import job_exec.db as db
+
 from htcluster.validators_3_9_compat import RunnerPayload
 
 LOG = structlog.get_logger()
@@ -49,6 +51,11 @@ def parse_args():
         "-d",
         action="store_true",
         help="do not perform any actions, just gather data and validate inputs",
+    )
+    parser.add_argument(
+        "--db-path",
+        type=Path,
+        default=Path("~/.config/var").expanduser()
     )
     return parser.parse_args()
 
@@ -122,6 +129,13 @@ def main():
 
     if args.json_logging:
         structlog.configure(processors=[structlog.processors.JSONRenderer()])
+
+    if not args.dry_run:
+        if not (db_parent := args.db_path.parent).exists():
+            LOG.info("db path does not exist, creating", path=str(db_parent))
+            db_parent.mkdir(parents=True)
+
+        job_db = db.connect(args.db_path)
 
     context = zmq.Context()
     socket = context.socket(zmq.REP)

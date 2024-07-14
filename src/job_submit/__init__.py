@@ -6,6 +6,7 @@ from htcluster.validators import ClusterJob, ImplicitOut, ProgrammaticJobParams
 from htcluster.validators_3_9_compat import JobArgs, RunnerPayload
 from job_exec.client import connect_local, connect_remote, send
 
+from .github import get_most_recent_container_hash
 from .ssh import chtc_ssh_client, copy_file, mkdir
 from .yaml import read_and_validate_job_yaml
 
@@ -94,9 +95,15 @@ def get_per_job_params(
 def main():
     args = parse_args()
     cluster_dir = Path("analysis-results")
+
     if not args.job_yaml.exists() and args.job_yaml.is_file():
         raise ValueError(f"{args.job_yaml} does not exist")
+
     job_descr = read_and_validate_job_yaml(args.job_yaml)
+
+    container_hash = get_most_recent_container_hash(job_descr.job.docker_image)
+    job_descr.job.docker_image = f"{job_descr.job.docker_image}@{container_hash}"
+
     job_dir = cluster_dir / job_descr.job.name
     input_dir = Path("inputs")
     output_dir = Path("outputs")
