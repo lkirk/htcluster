@@ -1,19 +1,54 @@
+import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 import structlog
-import sqlite3
+from dateutil import tz
 
-# BEGIN TRANSACTION; INSERT INTO job_classads VALUES (NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL); UPDATE jobs AS j SET cluster_id = c.cluster_id FROM job_classads AS c WHERE j.cluster_id = c.cluster_id; INSERT INTO jobs VALUES (1, NULL, NULL, NULL); COMMIT;
+from htcluster.validators_3_9_compat import RunnerPayload
 
 LOG = structlog.get_logger("db")
+ADS = [
+    ("Cmd", str),
+    ("Iwd", str),
+    ("JobPrio", int),
+    ("UserLog", str),
+    ("ClusterId", int),
+    ("StreamErr", int),
+    ("StreamOut", int),
+    ("DockerImage", str),
+    ("Environment", str),
+    ("JobUniverse", int),
+    ("RequestCpus", int),
+    ("RequestDisk", int),
+    ("JobBatchName", str),
+    ("Requirements", str),
+    ("CondorVersion", str),
+    ("RequestMemory", int),
+    ("TransferInput", str),
+    ("CondorPlatform", str),
+    ("TransferOutput", str),
+    ("JobNotification", int),
+    ("JobSubmitMethod", int),
+    ("LeaveJobInQueue", int),
+    ("DockerPullPolicy", str),
+    ("JobLeaseDuration", int),
+    ("ShouldTransferFiles", str),
+    ("TransferInputSizemb", int),
+    ("EnteredCurrentStatus", int),
+    ("WhenToTransferOutput", str),
+]
 
 
-def schema(con: sqlite3.Connection):
+def prepare_classads(): ...
+
+
+def schema(con: sqlite3.Connection) -> None:
     with con:
         con.execute(
             """CREATE TABLE job_classads (
-                   cmd TEXT, iwd TEXT, q_date INTEGER, my_type TEXT, job_prio INTEGER,
-                   user_log TEXT, cluster_id INTEGER PRIMARY KEY, stream_err INTEGER,
+                   cmd TEXT, iwd TEXT, job_prio INTEGER, user_log TEXT,
+                   cluster_id INTEGER PRIMARY KEY, stream_err INTEGER,
                    stream_out INTEGER, docker_image TEXT, environment TEXT,
                    job_universe INTEGER, request_cpus INTEGER, request_disk INTEGER,
                    job_batch_name TEXT, requirements TEXT, condor_version TEXT,
@@ -22,8 +57,7 @@ def schema(con: sqlite3.Connection):
                    job_submit_method INTEGER, leave_job_in_queue INTEGER,
                    docker_pull_policy TEXT, job_lease_duration INTEGER,
                    should_transfer_files TEXT, transfer_input_sizemb INTEGER,
-                   entered_current_status INTEGER, transfer_output_remaps TEXT,
-                   when_to_transfer_output TEXT
+                   entered_current_status INTEGER, when_to_transfer_output TEXT
             ) WITHOUT ROWID"""
         )
 
@@ -33,6 +67,7 @@ def schema(con: sqlite3.Connection):
                    num_procs INTEGER,
                    job_name TEXT,
                    submitted_on DATE,
+                   submitted_on_tz STRING,
                    FOREIGN KEY(cluster_id) REFERENCES job_classads(cluster_id)
             ) WITHOUT ROWID
             """
@@ -40,11 +75,12 @@ def schema(con: sqlite3.Connection):
 
         con.execute(
             """CREATE TABLE procs (
-                   cluster_id INTEGER PRIMARY KEY,
+                   cluster_id INTEGER,
                    in_files TEXT,
                    out_files TEXT,
                    params TEXT
-            ) WITHOUT ROWID"""
+                   FOREIGN KEY(cluster_id) REFERENCES job_classads(cluster_id)
+            ) WITH ROWID"""
         )
 
         con.execute(
@@ -66,16 +102,29 @@ def connect(db: Path) -> sqlite3.Connection:
     return con
 
 
-def insert_classad_job_data(con: sqlite3.Connection):
+# TODO: can't type sub_result (htcondor2._submit_result.SubmitResult)
+def write_submission_data(
+    con: sqlite3.Connection, submit_result, params: RunnerPayload
+) -> None:
+    classads = submit_result.clusterad()
+    submit_time = datetime.fromtimestamp(classads["QDate"]).astimezone(tz.tzlocal())
+    local_timezone = tz.tzlocal().tzname(datetime.now())
+    job_classads = [t(classads[ad]) for ad, t in ADS]
+    jobs = (
+        submit_result.cluster(),
+        submit_result.num_procs(),
+        params.job.name,
+        local_timezone,
+        submit_time,
+    )
+    procs = [
+        (submit_result.cluster(), str(p.in_files), str(p.out_files), p.params)
+        for p in params.params
+    ]
     try:
         with con:
             con.execute(
-                """INSERT INTO job_classads VALUES (
-                       NULL, NULL, NULL, NULL, NULL, NULL, 1, NULL, NULL, NULL,
-                       NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-                       NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-                       NULL, NULL
-                )"""
+                f"INSERT INTO job_classads VALUES ({', '.join(['?'] * len(job_classads))})"
             )
             con.execute(
                 """UPDATE jobs AS j
@@ -84,6 +133,18 @@ def insert_classad_job_data(con: sqlite3.Connection):
                        WHERE j.cluster_id = c.cluster_id
                 """
             )
-            con.execute("INSERT INTO jobs VALUES (1, NULL, NULL, NULL)")
+            con.executemany(
+                f"INSERT INTO jobs VALUES {', '.join(['?'] * len(jobs))}", jobs
+            )
+            con.execute(
+                """UPDATE procs AS p
+                       SET cluster_id = c.cluster_id
+                       FROM job_classads AS c
+                       WHERE p.cluster_id = c.cluster_id
+                """
+            )
+            con.executemany(
+                f"INSERT INTO procs VALUES {', '.join(['?'] * len(procs))}", procs
+            )
     except sqlite3.IntegrityError as e:
         LOG.exception(e)
