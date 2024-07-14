@@ -78,9 +78,9 @@ def schema(con: sqlite3.Connection) -> None:
                    cluster_id INTEGER,
                    in_files TEXT,
                    out_files TEXT,
-                   params TEXT
+                   params TEXT,
                    FOREIGN KEY(cluster_id) REFERENCES job_classads(cluster_id)
-            ) WITH ROWID"""
+            )"""
         )
 
         con.execute(
