@@ -80,7 +80,7 @@ def make_submission(
         "request_memory": payload.job.memory,
         "request_cpus": payload.job.cpus,
         "request_disk": payload.job.disk,
-        "arguments": f"{payload.job.entrypoint} '$(job_json)'",
+        "arguments": f"{payload.job.entrypoint} $(job_json)",
         "output": payload.log_dir / "logs/out/$(Process).log",
         "error": payload.log_dir / "logs/err/$(Process).log",
         "log": payload.log_dir / "cluster.log",
