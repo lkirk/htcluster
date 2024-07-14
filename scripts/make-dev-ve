@@ -1,4 +1,4 @@
 #!/bin/sh
 
 python -m venv ve
-ve/bin/pip install -e '.[dev]'
+ve/bin/pip install -e '.[dev,job_submit,job_exec]'

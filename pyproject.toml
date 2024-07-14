@@ -2,18 +2,24 @@
 name = "htcluster"
 version = "0.1"
 dependencies = [
-    "htcondor",
-    "numpy",
-    "paramiko",
     "pydantic",
-    "python-dateutil",
-    "pyyaml",
-    "pyzmq",
-    "requests",
     "structlog",
 ]
 
 [project.optional-dependencies]
+job_submit = [
+    "numpy",
+    "paramiko",
+    "python-dateutil",
+    "pyyaml",
+    "pyzmq",
+    "requests",
+]
+job_exec = [
+    "htcondor",
+    "python-dateutil",
+    "pyzmq",
+]
 dev = ["ipython"]
 
 [project.scripts]
