@@ -37,10 +37,10 @@ all = [
 ]
 
 [project.scripts]
-htcluster-submit = "job_submit:main"
-htcluster-server = "job_exec.server:main"
-htcluster-wrapper = "job_wrapper:main"
-get-container-hash = "scripts.get_container_hash:main"
+htcluster-submit = "htcluster.job_submit:main"
+htcluster-server = "htcluster.job_exec:main"
+htcluster-wrapper = "htcluster.job_wrapper:main"
+get-container-hash = "htcluster.scripts.get_container_hash:main"
 
 [tool.isort]
 profile = "black"
