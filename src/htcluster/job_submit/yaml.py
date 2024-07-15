@@ -7,25 +7,6 @@ import yaml
 from htcluster.validators import ClusterJob, ImplicitOut
 
 
-def file_sorter(path: Path, split_chars: list[str] = ["-", "_", ":", "."]):
-    keys = re.split(rf"[{''.join(split_chars)}]", path.name)
-    return tuple(map(lambda v: parse_num(v, strict=False), keys))
-
-
-def yaml_glob(loader, node):
-    try:
-        data = loader.construct_mapping(node)
-        dir = data["in-files"]
-        glob = data["glob"]
-    except yaml.constructor.ConstructorError:
-        dir, glob = loader.construct_scalar(node).split()
-
-    dir = Path(dir)
-    files = [Path(p) for p in sorted(dir.glob(glob), key=file_sorter)]
-    assert len(files) > 0, f"no files were found in glob {dir / glob}"
-    return files
-
-
 def parse_num(v: str, strict: bool = True) -> int | float | str:
     try:
         return int(v)
@@ -39,78 +20,95 @@ def parse_num(v: str, strict: bool = True) -> int | float | str:
     return v
 
 
-def yaml_range(loader, node) -> list[int | float]:
-    params = loader.construct_scalar(node).split()
+def file_sorter(path: Path, split_chars: list[str] = ["-", "_", ":", "."]):
+    keys = re.split(rf"[{''.join(split_chars)}]", path.name)
+    return tuple(map(lambda v: parse_num(v, strict=False), keys))
+
+
+def construct_mapping_with_required_args(
+    loader: yaml.Loader, node: yaml.MappingNode, required: set
+) -> dict:
+    args = loader.construct_mapping(node)
+    if len(extra_or_missing := args.keys() ^ required):
+        req = " ".join([f"'{f}'" for f in required])
+        raise ValueError(f"{req} are required. got: {extra_or_missing}")
+
+    return args
+
+
+def yaml_glob(loader: yaml.Loader, node: yaml.MappingNode):
+    args = construct_mapping_with_required_args(loader, node, {"dir", "glob"})
+    dir = Path(args["dir"])
+    files = [Path(p) for p in sorted(dir.glob(args["glob"]), key=file_sorter)]
+    assert len(files) > 0, f"no files were found in glob {dir / args['glob']}"
+    return files
+
+
+def yaml_range(loader: yaml.Loader, node: yaml.SequenceNode) -> list[int | float]:
+    params = loader.construct_sequence(node)
     start, stop, step = None, None, None
     match len(params):
         case 1:
-            (stop,) = map(parse_num, params)
+            (stop,) = params
         case 2:
-            start, stop = map(parse_num, params)
+            start, stop = params
         case 3:
-            start, stop, step = map(parse_num, params)
+            start, stop, step = params
         case _:
             raise ValueError(f"!range: must specify 1, 2, or 3 params. got: {params}")
-    if isinstance(step, float):
-        raise ValueError(f"step must be an int. got: {step}")
     if stop is None:
         raise ValueError("stop must be specified")
     if start is None:
-        # TODO: figure out typing here
-        assert not isinstance(stop, str)  # mypy
         return np.arange(stop).tolist()
     if step is None:
         return np.arange(start, stop).tolist()
     return np.arange(start, stop, step).tolist()
 
 
-def yaml_linspace(loader, node) -> list[float]:
-    params = loader.construct_scalar(node).split()
+def yaml_linspace(loader: yaml.Loader, node: yaml.SequenceNode) -> list[float]:
+    params = loader.construct_sequence(node)
     start, stop, num = None, None, None
     if len(params) == 3:
-        start, stop, num = map(parse_num, params)
+        start, stop, num = params
     else:
         raise ValueError(f"!linspace: must specify 3 params. got: {params}")
     if isinstance(num, float):
         raise ValueError(f"num must be an int. got: {num}")
-    # TODO: figure out typing here
-    assert not isinstance(stop, str)  # mypy
-    assert not isinstance(start, str)  # mypy
-    assert not isinstance(num, str)  # mypy
     return np.linspace(start, stop, num).tolist()
 
 
-def yaml_repeat(loader, node) -> list[str | int | float]:
-    if (m := re.match(r"\((![0-9a-z ]+)\)", node.value)) is not None:
-        nested_constructor = m.group(1).split()
-        tag, args = nested_constructor[0], nested_constructor[1:]
-        val = loader.yaml_constructors[tag](
-            loader, yaml.ScalarNode(tag=tag, value=" ".join(args))
-        )
-        n = parse_num(node.value[m.span()[-1] :].strip())
-    else:
-        raw = node.value.split()
-        if len(raw) != 2:
-            raise ValueError(f"!repeat: expect 2 arguments, got {raw}")
-        val, n = raw
-        n = parse_num(n)
-    if not isinstance(n, int):
-        raise ValueError(f"!repeat: number of repeats must be an int, got {n}")
-    return [val] * n
+def yaml_repeat(loader: yaml.Loader, node: yaml.MappingNode) -> list[str | int | float]:
+    args = construct_mapping_with_required_args(loader, node, {"rep", "n"})
+    return [args["rep"]] * args["n"]
 
 
-def yaml_implicit_out(loader, node) -> ImplicitOut:
+def yaml_flatten(
+    loader: yaml.Loader, node: yaml.MappingNode
+) -> list[str | int | float]:
+    args = construct_mapping_with_required_args(loader, node, {"arr"})
+    # ignore typing here, let numpy deal with it
+    return np.array(args["arr"]).flatten()  # type: ignore
+
+
+def yaml_implicit_out(loader: yaml.Loader, node: yaml.MappingNode) -> ImplicitOut:
     raw = node.value.split()
     if len(raw) > 1:
         raise ValueError(f"!implicit_out: expect 1 arguments, got {raw}")
     return ImplicitOut(raw[0])
 
 
+def yaml_file_range(loader: yaml.Loader, node: yaml.MappingNode) -> list[str]:
+    args = construct_mapping_with_required_args(loader, node, {"fmt", "num"})
+    return [args["fmt"].format(i) for i in range(args["num"])]
+
+
 yaml.SafeLoader.add_constructor("!glob", yaml_glob)
 yaml.SafeLoader.add_constructor("!range", yaml_range)
 yaml.SafeLoader.add_constructor("!linspace", yaml_linspace)
 yaml.SafeLoader.add_constructor("!repeat", yaml_repeat)
+yaml.SafeLoader.add_constructor("!flatten", yaml_flatten)
 yaml.SafeLoader.add_constructor("!implicit_out", yaml_implicit_out)
+yaml.SafeLoader.add_constructor("!file_range", yaml_file_range)
 
 
 def read_and_validate_job_yaml(in_yaml: Path) -> ClusterJob:
