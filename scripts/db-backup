@@ -10,6 +10,8 @@ mapfile -t TO_DEL < <(
     | sort -t' ' -k1n | awk 'BEGIN{c=0}{c+=1}c>5{print $2}'
 )
 
+mkdir -p "$(dirname $BACKUP_PATH)"
+
 # delete backups (if any) to keep 5
 for i in "${!TO_DEL[@]}"; do
     echo "[$(date)] deleting ${TO_DEL[$i]}"
@@ -17,5 +19,5 @@ for i in "${!TO_DEL[@]}"; do
 done
 
 BACKUP_FILE="$BACKUP_PATH/job_exec-$(date '+%s')-backup.db"
-sqlite3 job_exec.db <<< ".backup \"$BACKUP_FILE\""
+sqlite3 job_exec.db <<< ".backup $BACKUP_FILE"
 echo "[$(date)] created backup $BACKUP_FILE"
