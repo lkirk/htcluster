@@ -25,10 +25,11 @@ LOG = structlog.get_logger("github")
 
 def get_most_recent_container_hash(container_url: str, config: Config) -> str:
     github_user = config.github_user
+    github_token = read_github_token(config.github_token)
     package_name = container_url.replace(f"ghcr.io/{github_user}/", "")
     headers = {
         "Accept": "application/vnd.github+json",
-        "Authorization": f"Bearer {config.github_token}",
+        "Authorization": f"Bearer {github_token}",
         "X-GitHub-Api-Version": "2022-11-28",
     }
     url = (
