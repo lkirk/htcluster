@@ -3,11 +3,10 @@ from pathlib import Path
 from paramiko import SFTPClient, SSHClient
 
 
-def chtc_ssh_client() -> SSHClient:
+def chtc_ssh_client(remote_user: str, remote_server: str) -> SSHClient:
     client = SSHClient()
     client.load_system_host_keys()
-    # TODO: config
-    client.connect("ap2002.chtc.wisc.edu", username="lkirk2")
+    client.connect(remote_server, username=remote_user)
     return client
 
 

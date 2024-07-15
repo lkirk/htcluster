@@ -6,15 +6,14 @@ import sys
 import textwrap
 import urllib.parse
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 import requests
 from dateutil import tz
 
-GITHUB_API_TOKEN_PATH = Path("~/.github_token").expanduser()
+from htcluster.config import Config, load_config
+
 GITHUB_API_URL_BASE = "https://api.github.com"
-DOCKER_API_TOKEN_PATH = Path("~/.docker/config.json").expanduser()
 DOCKER_API_URL_BASE = "https://ghcr.io/v2"
 
 
@@ -39,11 +38,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_tokens() -> tuple[str, str]:
-    with open(GITHUB_API_TOKEN_PATH) as fp:
+def load_tokens(config: Config) -> tuple[str, str]:
+    with open(config.github_token) as fp:
         github_token = fp.read().strip()
 
-    with open(DOCKER_API_TOKEN_PATH) as fp:
+    with open(config.docker_token) as fp:
         docker_token = json.load(fp)["auths"]["ghcr.io"]["auth"]
 
     return github_token, docker_token
@@ -164,7 +163,8 @@ def print_result(
 
 def main():
     args = parse_args()
-    github_token, docker_token = load_tokens()
+    config = load_config()
+    github_token, docker_token = load_tokens(config)
     publish_time, container_hash = get_container_hash(
         github_token, args.github_user, args.package_name
     )

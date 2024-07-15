@@ -2,6 +2,7 @@ import argparse
 import re
 from pathlib import Path
 
+from htcluster.config import load_config
 from htcluster.job_exec.client import connect_local, connect_remote, send
 from htcluster.logging import log_config
 from htcluster.validators import ClusterJob, ImplicitOut, ProgrammaticJobParams
@@ -97,6 +98,7 @@ def get_per_job_params(
 
 def main():
     args = parse_args()
+    config = load_config()
     cluster_dir = Path("analysis-results")
 
     if not args.job_yaml.exists() and args.job_yaml.is_file():
@@ -104,7 +106,7 @@ def main():
 
     job_descr = read_and_validate_job_yaml(args.job_yaml)
 
-    container_hash = get_most_recent_container_hash(job_descr.job.docker_image)
+    container_hash = get_most_recent_container_hash(job_descr.job.docker_image, config)
     job_descr.job.docker_image = f"{job_descr.job.docker_image}@{container_hash}"
 
     job_dir = cluster_dir / job_descr.job.name
@@ -130,7 +132,7 @@ def main():
     )
 
     if not args.dry_run:
-        client = chtc_ssh_client()
+        client = chtc_ssh_client(config.ssh_remote_user, config.ssh_remote_server)
         with client.open_sftp() as sftp:
             mkdir(sftp, job_dir)
             mkdir(sftp, job_dir / input_dir)
@@ -149,13 +151,15 @@ def main():
                     )
                     print(f"copied {job_descr.params.in_files[j]}")
 
-        # TODO: config
-        socket = connect_remote(5555, "lkirk2", "ap2002.chtc.wisc.edu")
+        socket = connect_remote(
+            config.zmq_bind_port,
+            config.ssh_remote_user,
+            config.ssh_remote_server,
+        )
         send(socket, runner_payload)
     else:
         if args.test_local:
-            # TODO: config
-            socket = connect_local(5555)
+            socket = connect_local(config.zmq_bind_port)
             send(socket, runner_payload)
         else:
             print(runner_payload.model_dump_json(indent=2))
