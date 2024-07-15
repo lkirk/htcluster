@@ -1,0 +1,24 @@
+job:
+  name: two-pop-ld
+  memory: 1GB
+  disk: 1GB
+  cpus: 1
+  entrypoint: analysis.test:main
+  docker_image: ghcr.io/lkirk/tskit-ld/spatial-analysis
+  # classads: "(Target.HasCHTCStaging == true) && (has_avx2 == true)"
+params:
+  in_files:
+    !glob
+    dir: in-files
+    glob: "*.txt"
+  out_files: !implicit_out ".out"
+  # in_staging: staging-in  # use username config, transfer to staging
+  # out_staging: staging-in  # dir to transfer files to, make it to ensure it doesn't exist
+  params:
+    D:
+      !repeat
+      rep: !range [2]
+      n: 40
+    E: !repeat
+      rep: !linspace [1, 4, 4]
+      n: 40

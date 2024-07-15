@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# generate test data for test job
+
+set -euo pipefail
+
+TEST_DATA_DIR=in-files
+mkdir "$TEST_DATA_DIR"
+for i in {1..10}; do
+    for j in {1..2}; do
+	for k in 1234 1235; do
+	    touch "$TEST_DATA_DIR/$i-$j-$k.txt"
+	done
+    done
+done
+
