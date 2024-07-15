@@ -1,0 +1,19 @@
+#!/bin/bash
+
+set -euo pipefail
+
+DB_PATH=~/.local/var/job_exec.db
+BACKUP_PATH=~/.db-backup
+mapfile -t TO_DEL=<(
+    find \"$DB_PATH\" -maxdepth 1 -mindepth 1 -regex '.*job_exec-[0-9]+-backup\.db' \
+    | awk -F- '{print $(NF-1),$0}' \
+    | sort -t' ' -k1n | awk 'BEGIN{c=0}{c+=1}c>5{print $2}'
+)
+
+# delete backups (if any) to keep 5
+for i in "${!TO_DEL[@]}"; do
+    rm "${TO_DEL[$i]}"
+done
+
+BACKUP_FILE="$BACKUP_PATH/job_exec-$(date '+%s')-backup.db"
+sqlite3 job_exec.db <<< ".backup \"$BACKUP_FILE\""
