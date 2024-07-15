@@ -8,6 +8,5 @@ build/
 ve/
 
 # emacs tmp files
-*.~undo-tree~
 **/#*#
 **/.#*
