@@ -152,9 +152,7 @@ def main():
                     print(f"copied {job_descr.params.in_files[j]}")
 
         socket = connect_remote(
-            config.zmq_bind_port,
-            config.ssh_remote_user,
-            config.ssh_remote_server,
+            config.zmq_bind_port, config.ssh_remote_user, config.ssh_remote_server
         )
         send(socket, runner_payload)
     else:
