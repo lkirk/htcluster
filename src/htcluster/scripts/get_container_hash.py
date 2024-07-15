@@ -4,7 +4,7 @@ import argparse
 import json
 import sys
 import textwrap
-import urllib
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Optional

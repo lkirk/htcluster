@@ -1,4 +1,4 @@
-import urllib
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 

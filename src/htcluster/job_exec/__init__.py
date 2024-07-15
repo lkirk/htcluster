@@ -18,8 +18,9 @@ import structlog
 import zmq
 from pydantic import ValidationError
 
-import job_exec.db as db
 from htcluster.validators_3_9_compat import RunnerPayload
+
+from . import db
 
 LOG = structlog.get_logger()
 

@@ -2,10 +2,10 @@ import argparse
 import re
 from pathlib import Path
 
+from htcluster.job_exec.client import connect_local, connect_remote, send
 from htcluster.logging import log_config
 from htcluster.validators import ClusterJob, ImplicitOut, ProgrammaticJobParams
 from htcluster.validators_3_9_compat import JobArgs, RunnerPayload
-from job_exec.client import connect_local, connect_remote, send
 
 from .github import get_most_recent_container_hash
 from .ssh import chtc_ssh_client, copy_file, mkdir
