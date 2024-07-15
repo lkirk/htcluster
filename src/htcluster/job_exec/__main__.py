@@ -11,7 +11,10 @@ except ModuleNotFoundError:
 
 import argparse
 import gzip
+import signal
+import sqlite3
 from pathlib import Path
+from types import FrameType
 from typing import Any, Optional
 
 import structlog
@@ -122,24 +125,32 @@ def make_submission(
     return sub, itemdata
 
 
-def main():
-    args = parse_args()
+def register_signal_handler(
+    context: zmq.Context, job_db: sqlite3.Connection, signals: list[signal.Signals]
+) -> None:
+    def shutdown_handler(signum: int, frame: Optional[FrameType]) -> None:
+        LOG.info(
+            "received shutdown signal, shutting down",
+            signal=signal.Signals(signum).name,
+        )
+        context.destroy()
+        job_db.close()
+        sys.exit(0)
 
-    if args.json_logging:
-        structlog.configure(processors=[structlog.processors.JSONRenderer()])
+    for sig in signals:
+        signal.signal(sig, shutdown_handler)
 
-    if not (db_parent := args.db_path.parent).exists():
-        LOG.info("db path does not exist, creating", path=str(db_parent))
-        db_parent.mkdir(parents=True)
 
-    job_db = db.connect(args.db_path)
-
+def bind_socket(uri: str) -> tuple[zmq.Context, zmq.SyncSocket]:
     context = zmq.Context()
     socket = context.socket(zmq.REP)
-    addr = f"tcp://*:{args.port}"
-    socket.bind(addr)
-    LOG.info("listening", addr=addr)
+    socket.bind(uri)
+    return context, socket
 
+
+def serve_forever(
+    socket: zmq.SyncSocket, job_db: sqlite3.Connection, dry_run: bool
+) -> None:
     while True:
         m = parse_message(socket.recv())
         socket.send(b"ack")
@@ -147,16 +158,42 @@ def main():
             LOG.info(f"parsed job data for job: {m.job.name}")
             sub, itemdata = make_submission(m)
             LOG.info(f"submitting {sub}")
-            if args.dry_run is False:
+            if dry_run is False:
                 submission = htcondor.Submit(sub)
                 submission.issue_credentials()
 
                 schedd = htcondor.Schedd()
                 result = schedd.submit(submission, itemdata=iter(itemdata))
                 db.write_submission_data(job_db, result, m)
-                LOG.info("wrote job data to db", db=str(args.db_path))
+                LOG.info("wrote job data to db")
             else:
-                LOG.info(itemdata=itemdata)
+                import IPython; IPython.embed()
+                LOG.info("printing data", itemdata=str(itemdata)[0:1024])
+
+
+def main():
+    args = parse_args()
+
+    if args.json_logging:
+        structlog.configure(
+            processors=[
+                structlog.processors.dict_tracebacks,
+                structlog.processors.JSONRenderer(),
+            ]
+        )
+
+    if not (db_parent := args.db_path.parent).exists():
+        LOG.info("db path does not exist, creating", path=str(db_parent))
+        db_parent.mkdir(parents=True)
+
+    job_db = db.connect(args.db_path)
+    LOG.info("connected to job database", db=str(args.db_path))
+
+    uri = f"tcp://*:{args.port}"
+    context, socket = bind_socket(uri)
+    register_signal_handler(context, job_db, [signal.SIGINT, signal.SIGTERM])
+    serve_forever(socket, job_db, args.dry_run)
+    LOG.info("listening", addr=uri)
 
 
 if __name__ == "__main__":
