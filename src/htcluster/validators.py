@@ -1,8 +1,9 @@
 from pathlib import Path
 from typing import Optional, Self
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import ConfigDict, model_validator
 
+from .validator_base import BaseModel
 from .validators_3_9_compat import JobSettings
 
 

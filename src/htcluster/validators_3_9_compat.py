@@ -3,13 +3,17 @@ The cluster uses python 3.9, so split these validators into their
 own module to ensure that the server script is completely compatible
 with python 3.9
 """
+
 import re
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import field_validator
+
+from .validator_base import BaseModel
 
 SIZE_PAT = re.compile("[0-9]+(K|M|G|T)(B)?")
+
 
 class JobSettings(BaseModel):
     name: str
@@ -45,4 +49,3 @@ class RunnerPayload(BaseModel):
     in_files: list[Path]
     out_files: list[Path]
     # in_from_staging: bool
-
