@@ -24,7 +24,17 @@ job_exec = [
     "pyzmq",
 ]
 dev = ["ipython"]
-all = ["htcluster[job_submit,job_exec,dev]"]
+# unfortunately we can't reference the other groups
+all = [
+    "htcondor",
+    "ipython",
+    "numpy",
+    "paramiko",
+    "python-dateutil",
+    "pyyaml",
+    "pyzmq",
+    "requests",
+]
 
 [project.scripts]
 htcluster-submit = "job_submit:main"
@@ -40,5 +50,3 @@ venvPath = "."
 venv = "ve"
 
 [tool.setuptools_scm]
-version_scheme = "guess-next-dev"
-local_scheme = "dirty-tag"
