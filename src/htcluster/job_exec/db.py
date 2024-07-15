@@ -115,7 +115,12 @@ def write_submission_data(
         local_timezone,
     )
     procs = [
-        (submit_result.cluster(), str(p.in_files), str(p.out_files), p.model_dump_json())
+        (
+            submit_result.cluster(),
+            str(p.in_files),
+            str(p.out_files),
+            p.model_dump_json(),
+        )
         for p in params.params
     ]
     try:
