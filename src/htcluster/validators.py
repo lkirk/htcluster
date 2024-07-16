@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Optional, Self
 
-from pydantic import ConfigDict, model_validator
+from pydantic import ConfigDict, field_validator, model_validator
 
 from .validator_base import BaseModel
 from .validators_3_9_compat import JobSettings
@@ -14,7 +14,7 @@ class ImplicitOut:
         self.suffix = suffix
 
 
-class ProgrammaticJobParams(BaseModel):
+class JobParams(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     in_files: list[Path] = []
@@ -24,11 +24,18 @@ class ProgrammaticJobParams(BaseModel):
         None
     )
 
+    @field_validator("out_files")
+    @classmethod
+    def out_files_relative(cls, v: Path | ImplicitOut) -> Path | ImplicitOut:
+        if isinstance(v, Path):
+            assert Path(v.name) == v, "output paths should be name only, no subdirs"
+        return v
+
 
 class ClusterJob(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     job: JobSettings
-    params: dict[str, ProgrammaticJobParams] | ProgrammaticJobParams
+    params: JobParams
     n_jobs: int = 0
     grouped: bool = False
 
@@ -36,13 +43,13 @@ class ClusterJob(BaseModel):
     def validate_params(self) -> Self:
         jp = self.params
         match jp:
-            case ProgrammaticJobParams():
+            case JobParams():
                 self._validate_prog_job_params(jp)
             case dict():
                 raise Exception("grouped jobs not supported (yet)")
         return self
 
-    def _validate_prog_job_params(self, jp: ProgrammaticJobParams):
+    def _validate_prog_job_params(self, jp: JobParams):
         match (len(jp.in_files) > 0, jp.params is not None):
             case (True, True):
                 n_files = len(jp.in_files)

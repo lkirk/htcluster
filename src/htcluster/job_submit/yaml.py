@@ -7,7 +7,7 @@ import yaml
 from htcluster.validators import ClusterJob, ImplicitOut
 
 
-def parse_num(v: str, strict: bool = True) -> int | float | str:
+def parse_num(v: str) -> int | float | str:
     try:
         return int(v)
     except ValueError:
@@ -15,14 +15,13 @@ def parse_num(v: str, strict: bool = True) -> int | float | str:
     try:
         return float(v)
     except ValueError:
-        if strict is True:
-            raise ValueError("{v} could not be interpreted as an int or float")
+        pass
     return v
 
 
 def file_sorter(path: Path, split_chars: list[str] = ["-", "_", ":", "."]):
     keys = re.split(rf"[{''.join(split_chars)}]", path.name)
-    return tuple(map(lambda v: parse_num(v, strict=False), keys))
+    return tuple(map(lambda v: parse_num(v), keys))
 
 
 def construct_mapping_with_required_args(

@@ -6,7 +6,7 @@ with python 3.9
 
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import field_validator
 
@@ -23,6 +23,8 @@ class JobSettings(BaseModel):
     entrypoint: str
     docker_image: str
     classads: str = ""
+    in_staging: bool = False
+    out_staging: bool = False
 
     @field_validator("disk", "memory")
     @classmethod
@@ -46,6 +48,23 @@ class RunnerPayload(BaseModel):
     out_dir: Path
     log_dir: Path
     params: list[JobArgs]
-    in_files: list[Path]
-    out_files: list[Path]
-    # in_from_staging: bool
+    in_files: list[Path] = []
+    out_files: list[Path] = []
+    in_files_staging: list[str] = []
+    out_files_staging: list[str] = []
+
+    def get_in_file(self, idx: int) -> Union[Path, str]:
+        if self.job.in_staging:
+            return self.in_files_staging[idx]
+        return self.in_files[idx]
+
+    def get_out_file(self, idx: int) -> Union[Path, str]:
+        if self.job.out_staging:
+            return self.out_files_staging[idx]
+        return self.out_files[idx]
+
+    def has_inputs(self):
+        return (len(self.in_files) > 0) or (len(self.in_files_staging) > 0)
+
+    def has_outputs(self):
+        return (len(self.out_files) > 0) or (len(self.out_files_staging) > 0)

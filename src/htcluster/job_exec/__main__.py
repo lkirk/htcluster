@@ -94,22 +94,32 @@ def make_submission(
         "log": payload.log_dir / "cluster.log",
     }
 
-    if payload.job.classads is not None:
-        sub.update({"requirements": payload.job.classads})
+    classads = payload.job.classads
+    if payload.job.in_staging or payload.job.out_staging:
+        # Ensure that the target has access to staging if we're using it
+        if classads:
+            # TODO: could use a regex to avoid extra parentheses
+            classads = f"({classads}) && (Target.HasCHTCStaging == true)"
+        else:
+            classads = "(Target.HasCHTCStaging == true)"
+
+    if classads:
+        sub.update({"requirements": classads})
 
     for p in payload.params:
         itemdata.append({"job_json": p.model_dump_json().replace('"', r"\"")})
 
-    if len(payload.in_files) > 0:
+    if payload.has_inputs():
         sub.update({"transfer_input_files": "$(in_file)"})
         for j in range(len(payload.params)):
-            itemdata[j].update({"in_file": str(payload.in_files[j])})
+            itemdata[j].update({"in_file": str(payload.get_in_file(j))})
 
-    if len(payload.out_files) > 0:
+    # we currently don't allow jobs to not have outputs in the submission script
+    if payload.has_outputs():
         sub.update(
             {
                 "should_transfer_files": "YES",
-                "transfer_output_files": "ON_EXIT",
+                "when_to_transfer_output": "ON_EXIT",
                 "transfer_output_files": "$(job_out_file)",
                 "transfer_output_remaps": '"$(job_out_file) = $(out_file)"',
             }
@@ -118,7 +128,7 @@ def make_submission(
             itemdata[j].update(
                 {
                     "job_out_file": str(payload.params[j].out_files),
-                    "out_file": str(payload.out_files[j]),
+                    "out_file": str(payload.get_out_file(j)),
                 }
             )
 
@@ -156,7 +166,12 @@ def serve_forever(
         socket.send(b"ack")
         if m is not None:
             LOG.info(f"parsed job data for job: {m.job.name}")
-            sub, itemdata = make_submission(m)
+            try:
+                sub, itemdata = make_submission(m)
+            except Exception as e:
+                LOG.exception(e)
+                continue
+
             LOG.info(f"submitting {sub}")
             if dry_run is False:
                 submission = htcondor.Submit(sub)
@@ -167,7 +182,6 @@ def serve_forever(
                 db.write_submission_data(job_db, result, m)
                 LOG.info("wrote job data to db")
             else:
-                import IPython; IPython.embed()
                 LOG.info("printing data", itemdata=str(itemdata)[0:1024])
 
 

@@ -1,11 +1,12 @@
 import argparse
 import re
 from pathlib import Path
+from urllib.parse import urlunparse
 
 from htcluster.config import load_config
 from htcluster.job_exec.client import connect_local, connect_remote, send
 from htcluster.logging import log_config
-from htcluster.validators import ClusterJob, ImplicitOut, ProgrammaticJobParams
+from htcluster.validators import ClusterJob, ImplicitOut, JobSettings
 from htcluster.validators_3_9_compat import JobArgs, RunnerPayload
 
 from .github import get_most_recent_container_hash
@@ -13,6 +14,11 @@ from .ssh import chtc_ssh_client, copy_file, mkdir
 from .yaml import read_and_validate_job_yaml
 
 log_config()
+
+# Standard job sub-directories
+LOG_DIR = Path("log")
+INPUT_DIR = Path("input")
+OUTPUT_DIR = Path("output")
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,60 +46,85 @@ def get_implicit_out(path: Path | str | int, suffix: str) -> Path:
     return strip_suffixes(str(path)).with_suffix(suffix)
 
 
-def get_implicit_out_files(cj: ClusterJob, output_dir: Path) -> list[Path]:
+def get_implicit_out_files(cj: ClusterJob) -> list[Path]:
     out_files = []
-    assert isinstance(cj.params, ProgrammaticJobParams)  # mypy
     assert isinstance(cj.params.out_files, ImplicitOut)  # mypy
     suffix = cj.params.out_files.suffix
     for j in range(cj.n_jobs):
         if len(cj.params.in_files) > 0:
-            out_files.append(
-                output_dir / get_implicit_out(cj.params.in_files[j].name, suffix)
-            )
+            out_files.append(get_implicit_out(cj.params.in_files[j].name, suffix))
         else:
-            out_files.append(output_dir / get_implicit_out(j, suffix))
+            out_files.append(get_implicit_out(j, suffix))
     return out_files
 
 
-def get_per_job_params(
-    cj: ClusterJob, input_dir: Path, out_files: list[Path]
-) -> list[JobArgs]:
-    params = []
-    in_files = []
-    # TODO: grouped job params
-    assert isinstance(cj.params, ProgrammaticJobParams)  # mypy
+def file_url(path: Path) -> str:
+    scheme = "file"
+    netloc, params, query, fragment = ("", "", "", "")
+    return urlunparse((scheme, netloc, str(path), params, query, fragment))
 
-    match (len(cj.params.in_files) > 0, cj.params.params is not None):
-        case (True, True):
-            for j in range(cj.n_jobs):
-                assert cj.params.params is not None  # mypy
-                in_files.append(input_dir / cj.params.in_files[j].name)
-                params.append(
-                    JobArgs(
-                        in_files=Path(cj.params.in_files[j].name),
-                        out_files=Path(out_files[j].name),
-                        params={k: cj.params.params[k][j] for k in cj.params.params},
-                    )
-                )
-        case (False, True):
-            for j in range(cj.n_jobs):
-                assert cj.params.params is not None  # mypy
-                params.append(
-                    JobArgs(
-                        params={k: cj.params.params[k][j] for k in cj.params.params},
-                        out_files=Path(out_files[j].name),
-                    )
-                )
-        case (True, False):
-            for j in range(cj.n_jobs):
-                params.append(
-                    JobArgs(
-                        in_files=input_dir / cj.params.in_files[j].name,
-                        out_files=Path(out_files[j].name),
-                    )
-                )
 
-    return params
+def get_input_output_dirs(
+    job_params: JobSettings, ssh_remote_user: str, job_dir: Path
+) -> tuple[Path | None, Path, Path, Path, Path]:
+    if job_params.in_staging or job_params.out_staging:
+        staging_dir = Path("/staging") / ssh_remote_user / job_params.name
+        input_dir = staging_dir / INPUT_DIR if job_params.in_staging else INPUT_DIR
+        output_dir = staging_dir / OUTPUT_DIR if job_params.out_staging else OUTPUT_DIR
+        in_job_dir = input_dir if job_params.in_staging else job_dir / INPUT_DIR
+        out_job_dir = output_dir if job_params.out_staging else job_dir / OUTPUT_DIR
+        return staging_dir, input_dir, output_dir, in_job_dir, out_job_dir
+    return None, INPUT_DIR, OUTPUT_DIR, job_dir / INPUT_DIR, job_dir / OUTPUT_DIR
+
+
+def get_runner_payload(
+    cj: ClusterJob, input_dir: Path, output_dir: Path, job_dir: Path
+) -> RunnerPayload:
+    # resolve implicit out files (if any)
+    # at this point, the outfiles are only filenames (we validate the input)
+    if isinstance(cj.params.out_files, ImplicitOut):
+        out_names = get_implicit_out_files(cj)
+    else:
+        out_names = cj.params.out_files
+
+    have_in_files = len(cj.params.in_files) > 0
+    params = [
+        JobArgs(
+            in_files=Path(cj.params.in_files[j].name) if have_in_files else None,
+            out_files=out_names[j],
+            params=(
+                {k: cj.params.params[k][j] for k in cj.params.params}
+                if cj.params.params is not None
+                else None
+            ),
+        )
+        for j in range(cj.n_jobs)
+    ]
+
+    in_files, out_files, in_files_staging, out_files_staging = [], [], [], []
+    if cj.job.in_staging:
+        in_files_staging = [file_url(input_dir / f.name) for f in cj.params.in_files]
+    else:
+        in_files = [input_dir / f.name for f in cj.params.in_files]
+    if cj.job.out_staging:
+        out_files_staging = [file_url(output_dir / f.name) for f in out_names]
+    else:
+        out_files = [output_dir / f.name for f in out_names]
+
+    payload = RunnerPayload(
+        job=cj.job,
+        job_dir=job_dir,
+        out_dir=output_dir,
+        log_dir=LOG_DIR,
+        params=params,
+        # staging directories are urls
+        in_files=in_files,
+        out_files=out_files,
+        in_files_staging=in_files_staging,
+        out_files_staging=out_files_staging,
+    )
+
+    return payload
 
 
 def main():
@@ -110,45 +141,26 @@ def main():
     job_descr.job.docker_image = f"{job_descr.job.docker_image}@{container_hash}"
 
     job_dir = cluster_dir / job_descr.job.name
-    input_dir = Path("input")
-    output_dir = Path("output")
-    log_dir = Path("log")
-
-    assert isinstance(job_descr.params, ProgrammaticJobParams)
-    if isinstance(job_descr.params.out_files, ImplicitOut):
-        out_files = get_implicit_out_files(job_descr, output_dir)
-    else:
-        out_files = job_descr.params.out_files
-    job_params = get_per_job_params(job_descr, input_dir, out_files)
-
-    runner_payload = RunnerPayload(
-        job=job_descr.job,
-        job_dir=job_dir,
-        out_dir=output_dir,
-        log_dir=log_dir,
-        params=job_params,
-        out_files=out_files,
-        in_files=[input_dir / f.name for f in job_descr.params.in_files],
+    staging_dir, input_dir, output_dir, job_input_dir, job_output_dir = (
+        get_input_output_dirs(job_descr.job, config.ssh_remote_user, job_dir)
     )
 
+    runner_payload = get_runner_payload(job_descr, input_dir, output_dir, job_dir)
+    make_remote_dirs = [staging_dir] if staging_dir else []
+    make_remote_dirs.extend([job_dir, job_dir / LOG_DIR, job_input_dir, job_output_dir])
     if not args.dry_run:
         client = chtc_ssh_client(config.ssh_remote_user, config.ssh_remote_server)
         with client.open_sftp() as sftp:
-            mkdir(sftp, job_dir)
-            mkdir(sftp, job_dir / input_dir)
-            mkdir(sftp, job_dir / output_dir)
-            mkdir(sftp, job_dir / log_dir)
-            assert isinstance(job_descr.params, ProgrammaticJobParams)  # mypy
+            for d in make_remote_dirs:
+                mkdir(sftp, d)
             for j, params in enumerate(runner_payload.params):
-                if (
-                    params.in_files is not None
-                    and job_descr.params.in_files is not None
-                ):
+                if params.in_files and job_descr.params.in_files:
                     copy_file(
                         sftp,
                         job_descr.params.in_files[j],
-                        job_dir / input_dir / params.in_files,
+                        job_input_dir / params.in_files,
                     )
+                    # TODO: logging
                     print(f"copied {job_descr.params.in_files[j]}")
 
         socket = connect_remote(
@@ -160,6 +172,17 @@ def main():
             socket = connect_local(config.zmq_bind_port)
             send(socket, runner_payload)
         else:
+            import sys
+
+            for d in make_remote_dirs:
+                print(f"mkdir {d}", file=sys.stderr)
+            for j, params in enumerate(runner_payload.params):
+                if params.in_files and job_descr.params.in_files:
+                    print(
+                        f"copy {job_descr.params.in_files[j]} -> {job_dir / input_dir / params.in_files}",
+                        file=sys.stderr,
+                    )
+
             print(runner_payload.model_dump_json(indent=2))
 
         # write_file(
