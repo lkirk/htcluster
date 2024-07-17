@@ -1,6 +1,9 @@
 from pathlib import Path
 
+import structlog
 from paramiko import SFTPClient, SSHClient
+
+LOG = structlog.get_logger()
 
 
 def chtc_ssh_client(remote_user: str, remote_server: str) -> SSHClient:
@@ -10,22 +13,25 @@ def chtc_ssh_client(remote_user: str, remote_server: str) -> SSHClient:
     return client
 
 
-def mkdir(client: SFTPClient, path: Path) -> None:
+def mkdir_sftp(client: SFTPClient, path: Path) -> None:
     try:
         client.stat(str(path))
         raise Exception(f"{path} exists on remote server")
     except FileNotFoundError:
         pass
     try:
+        LOG.info("creating dir", dir=str(path))
         client.mkdir(str(path))
     except FileNotFoundError:
         raise Exception(f"{path.parent} does not exist on remote server")
 
 
-def write_file(client: SFTPClient, dest: Path, data: str) -> None:
+def write_file_sftp(client: SFTPClient, dest: Path, data: str) -> None:
+    LOG.info("writing file", dest=str(dest))
     with client.open(str(dest), "w") as fp:
         fp.write(data)
 
 
-def copy_file(client: SFTPClient, source: Path, dest: Path) -> None:
+def copy_file_sftp(client: SFTPClient, source: Path, dest: Path) -> None:
+    LOG.info("copying file", src=str(source), dest=str(dest))
     client.put(str(source), str(dest), confirm=True)
