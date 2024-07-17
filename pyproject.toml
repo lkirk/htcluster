@@ -44,9 +44,14 @@ get-container-hash = "htcluster.scripts.get_container_hash:main"
 
 [tool.isort]
 profile = "black"
+src_paths = ["src"]
 
 [tool.pyright]
 venvPath = "."
 venv = "ve"
+
+[tool.ruff]
+src = ["src"]
+select = ["ALL"]
 
 [tool.setuptools_scm]
