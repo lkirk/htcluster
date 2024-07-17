@@ -52,6 +52,5 @@ venv = "ve"
 
 [tool.ruff]
 src = ["src"]
-select = ["ALL"]
 
 [tool.setuptools_scm]
