@@ -1,0 +1,6 @@
+#!/bin/bash
+
+python -m venv ~/.venv/htcluster
+source ~/.venv/htcluster/bin/activate
+pip install -U pip setuptools
+pip install ~/repo/htcluster/'.[job_exec]'
