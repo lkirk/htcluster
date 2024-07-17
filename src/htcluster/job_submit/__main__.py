@@ -1,19 +1,25 @@
 import argparse
 import re
+import sys
+from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import urlunparse
 
-from htcluster.config import load_config
+import structlog
+
+from htcluster.config import Config, load_config
 from htcluster.job_exec.client import connect_local, connect_remote, send
 from htcluster.logging import log_config
+from htcluster.validator_base import BaseModel
 from htcluster.validators import ClusterJob, ImplicitOut, JobSettings
 from htcluster.validators_3_9_compat import JobArgs, RunnerPayload
 
 from .github import get_most_recent_container_hash
-from .ssh import chtc_ssh_client, copy_file, mkdir
-from .yaml import read_and_validate_job_yaml
+from .ssh import chtc_ssh_client, copy_file_sftp, mkdir_sftp
 
 log_config()
+LOG = structlog.get_logger()
+
 
 # Standard job sub-directories
 LOG_DIR = Path("log")
@@ -21,21 +27,8 @@ INPUT_DIR = Path("input")
 OUTPUT_DIR = Path("output")
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("job_yaml", type=Path, help="input job description yaml")
-    parser.add_argument(
-        "--dry-run",
-        "-d",
-        action="store_true",
-        help="do not perform any actions, just gather data and validate inputs",
-    )
-    parser.add_argument(
-        "--test-local",
-        action="store_true",
-        help="test against a local server instance, do not use ssh",
-    )
-    return parser.parse_args()
+# Path on remote server (relative to homedir) where results will be stored
+CLUSTER_DIR = Path("analysis-results")
 
 
 def strip_suffixes(name: str) -> Path:
@@ -127,70 +120,221 @@ def get_runner_payload(
     return payload
 
 
-def main():
-    args = parse_args()
+class SubmissionData(BaseModel):
+    # copy of the parsed yaml obj that produced this data
+    cj: ClusterJob
+    # data to be sent to job execution server
+    payload: RunnerPayload
+    # directory to which input files will be copied (if any inputs)
+    job_input_dir: Path
+    # directories to be made in preparation for job submission (outputs, logs, etc)
+    remote_dirs: list[Path]
+    # staging directory to store inputs or outputs (if specified)
+    staging_dir: Path | None
+
+
+def get_submission_data(cj: ClusterJob, config: Config) -> SubmissionData:
+    cluster_dir = CLUSTER_DIR
+
+    # hit the github api to find the most recent container hash it's more
+    # reliable to specify the exact container hash to be run on the cluster
+    container_hash = get_most_recent_container_hash(cj.job.docker_image, config)
+    cj.job.docker_image = f"{cj.job.docker_image}@{container_hash}"
+
+    job_dir = cluster_dir / cj.job.name
+    staging_dir, input_dir, output_dir, job_input_dir, job_output_dir = (
+        get_input_output_dirs(cj.job, config.ssh_remote_user, job_dir)
+    )
+
+    runner_payload = get_runner_payload(cj, input_dir, output_dir, job_dir)
+    remote_dirs = [job_dir, job_dir / LOG_DIR, job_input_dir, job_output_dir]
+
+    return SubmissionData(
+        cj=cj,
+        payload=runner_payload,
+        job_input_dir=job_input_dir,
+        remote_dirs=remote_dirs,
+        staging_dir=staging_dir,
+    )
+
+
+class MockSshClient:
+    @contextmanager
+    def open_sftp(self):
+        yield
+
+
+def print_mkdir(client: None, d: Path) -> None:
+    print(f"mkdir {d}", file=sys.stderr)
+
+
+def print_copy_file(client: None, src: Path, dest: Path) -> None:
+    print(f"copy {src} -> {dest}", file=sys.stderr)
+
+
+def copy_files_prep_dirs(sub: SubmissionData, config: Config, dry_run: bool) -> None:
+    """
+    Using the paramiko sftp client, make all of the required output directories
+    and copy inputs (if any).
+
+    TODO: figure out how to use rsync (it's much faster for large file copies)
+
+    NB: we mock the ssh client and file copies if we're performing a dry
+    run. this helps to keep the logic up to date if anything changes.
+    """
+    if dry_run:
+        client = MockSshClient()
+        mkdir = print_mkdir
+        copy_file = print_copy_file
+    else:
+        LOG.info(
+            "connecting via ssh to remote server",
+            user=config.ssh_remote_user,
+            server=config.ssh_remote_server,
+        )
+        client = chtc_ssh_client(config.ssh_remote_user, config.ssh_remote_server)
+        mkdir = mkdir_sftp
+        copy_file = copy_file_sftp
+
+    with client.open_sftp() as sftp:
+        if sub.staging_dir:
+            mkdir(sftp, sub.staging_dir)  # type: ignore
+        for d in sub.remote_dirs:
+            mkdir(sftp, d)  # type: ignore
+        for j, params in enumerate(sub.payload.params):
+            if params.in_files and sub.cj.params.in_files:
+                copy_file(
+                    sftp,  # type: ignore
+                    sub.cj.params.in_files[j],
+                    sub.job_input_dir / params.in_files,
+                )
+                # TODO: logging
+                if not dry_run:
+                    print(f"copied {sub.cj.params.in_files[j]}")
+
+
+def send_submission_data(
+    sub: SubmissionData, config: Config, test_local: bool, dry_run: bool
+) -> None:
+    # if we're not running a local server, do nothing
+    if dry_run and not test_local:
+        return
+
+    # if we're testing locally, connect to a local instance of the execution
+    # server and send the payload
+    if test_local:
+        socket = connect_local(config.zmq_bind_port)
+        send(socket, sub.payload)
+        return
+
+    # connect to remote server through an ssh tunnel
+    socket = connect_remote(
+        config.zmq_bind_port, config.ssh_remote_user, config.ssh_remote_server
+    )
+    # send the job submission data to the remote server as gzipped json
+    send(socket, sub.payload)
+
+
+def load_job_yaml(job_yaml: Path | str) -> ClusterJob:
+    """
+    Takes three different input types:
+
+    1. string path to yaml file
+    2. yaml document in string form
+    3. path object encoding the location of the yaml file
+
+    If a string is provided, we check if it's a file by testing if the string
+    encodes a file that exists, otherwise we attempt to load the string as json.
+    """
+    match job_yaml:
+        case Path():
+            cj = ClusterJob.from_yaml_file(job_yaml)
+        case str():
+            if not (job_yaml_path := Path(job_yaml)).exists():
+                try:
+                    cj = ClusterJob.from_yaml_str(job_yaml)
+                except TypeError as te:
+                    raise ValueError(
+                        f"failed to load {job_yaml} as a string because it's not a file"
+                    ) from te
+            else:
+                cj = ClusterJob.from_yaml_file(job_yaml_path)
+        case _:
+            raise ValueError(
+                "Expected 'job_yaml' to be a 'str' or "
+                f"'pathlib.Path', got {type(job_yaml)}"
+            )
+    return cj
+
+
+def run_cluster_job(
+    job_yaml: Path | str, dry_run=False, test_local=False
+) -> SubmissionData:
+    """
+    Main entrypoint for running jobs.
+
+    Load the job yaml, copy files to the submit server, and send a request to
+    the job executor to submit the job to htcondor. We can specify if this is a
+    "dry run" to see what the submission would look like. In addition, if we
+    have a local execution server running with "--dry-run", we can submit to the
+    test server.
+
+    NB: To run this, you'll need a config file in place (see docs).
+
+    :param job_yaml: Path to yaml file or a valid yaml string
+    :param dry_run: Print actions that would be performed
+    :param test_local: Submit jobs to a local test server
+    :returns: Parsed and transformed submission data
+
+    """
     config = load_config()
-    cluster_dir = Path("analysis-results")
+    LOG.info("start", dry_run=dry_run, test_local=test_local)
+    job_descr = load_job_yaml(job_yaml)
+    sub_data = get_submission_data(job_descr, config)
+
+    if not dry_run:
+        copy_files_prep_dirs(sub_data, config, dry_run=False)
+        send_submission_data(sub_data, config, test_local=False, dry_run=False)
+    else:
+        copy_files_prep_dirs(sub_data, config, dry_run=True)
+        send_submission_data(sub_data, config, test_local=test_local, dry_run=True)
+        print(sub_data.payload.model_dump_json(indent=2))
+
+    return sub_data
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("job_yaml", type=Path, help="input job description yaml")
+    parser.add_argument(
+        "--dry-run",
+        "-d",
+        action="store_true",
+        help="do not perform any actions, just gather data and validate inputs",
+    )
+    parser.add_argument(
+        "--test-local",
+        action="store_true",
+        help="test against a local server instance, do not use ssh",
+    )
+    args = parser.parse_args()
+    if (not args.dry_run) and args.test_local:
+        parser.error(
+            "--dry-run is not specified, but --test-local is. specify --dry-run.",
+        )
+    return args
+
+
+def main():
+    """
+    Main entrypoint for the job submission script
+    """
+    args = parse_args()
 
     if not args.job_yaml.exists() and args.job_yaml.is_file():
         raise ValueError(f"{args.job_yaml} does not exist")
 
-    job_descr = read_and_validate_job_yaml(args.job_yaml)
-
-    container_hash = get_most_recent_container_hash(job_descr.job.docker_image, config)
-    job_descr.job.docker_image = f"{job_descr.job.docker_image}@{container_hash}"
-
-    job_dir = cluster_dir / job_descr.job.name
-    staging_dir, input_dir, output_dir, job_input_dir, job_output_dir = (
-        get_input_output_dirs(job_descr.job, config.ssh_remote_user, job_dir)
-    )
-
-    runner_payload = get_runner_payload(job_descr, input_dir, output_dir, job_dir)
-    make_remote_dirs = [staging_dir] if staging_dir else []
-    make_remote_dirs.extend([job_dir, job_dir / LOG_DIR, job_input_dir, job_output_dir])
-    if not args.dry_run:
-        client = chtc_ssh_client(config.ssh_remote_user, config.ssh_remote_server)
-        with client.open_sftp() as sftp:
-            for d in make_remote_dirs:
-                mkdir(sftp, d)
-            for j, params in enumerate(runner_payload.params):
-                if params.in_files and job_descr.params.in_files:
-                    copy_file(
-                        sftp,
-                        job_descr.params.in_files[j],
-                        job_input_dir / params.in_files,
-                    )
-                    # TODO: logging
-                    print(f"copied {job_descr.params.in_files[j]}")
-
-        socket = connect_remote(
-            config.zmq_bind_port, config.ssh_remote_user, config.ssh_remote_server
-        )
-        send(socket, runner_payload)
-    else:
-        if args.test_local:
-            socket = connect_local(config.zmq_bind_port)
-            send(socket, runner_payload)
-        else:
-            import sys
-
-            for d in make_remote_dirs:
-                print(f"mkdir {d}", file=sys.stderr)
-            for j, params in enumerate(runner_payload.params):
-                if params.in_files and job_descr.params.in_files:
-                    print(
-                        f"copy {job_descr.params.in_files[j]} -> {job_dir / input_dir / params.in_files}",
-                        file=sys.stderr,
-                    )
-
-            print(runner_payload.model_dump_json(indent=2))
-
-        # write_file(
-        #     sftp,
-        #     input_dir / f"params_{j}.json",
-        #     json.dumps(params, indent=2),
-        # )
-        # print(f"wrote params for job {j}")
+    run_cluster_job(args.job_yaml, args.dry_run, args.test_local)
 
 
 if __name__ == "__main__":
