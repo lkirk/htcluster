@@ -4,7 +4,12 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from htcluster.validators import ClusterJob, ImplicitOut
+
+class ImplicitOut:
+    suffix: str
+
+    def __init__(self, suffix: str):
+        self.suffix = suffix
 
 
 def parse_num(v: str) -> int | float | str:
@@ -108,8 +113,3 @@ yaml.SafeLoader.add_constructor("!repeat", yaml_repeat)
 yaml.SafeLoader.add_constructor("!flatten", yaml_flatten)
 yaml.SafeLoader.add_constructor("!implicit_out", yaml_implicit_out)
 yaml.SafeLoader.add_constructor("!file_range", yaml_file_range)
-
-
-def read_and_validate_job_yaml(in_yaml: Path) -> ClusterJob:
-    with open(in_yaml, "r") as fp:
-        return ClusterJob(**yaml.safe_load(fp))

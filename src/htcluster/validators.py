@@ -3,15 +3,10 @@ from typing import Optional, Self
 
 from pydantic import ConfigDict, field_validator, model_validator
 
+from htcluster.job_submit.yaml import ImplicitOut, yaml  # TODO: does module make sense?
+
 from .validator_base import BaseModel
 from .validators_3_9_compat import JobSettings
-
-
-class ImplicitOut:
-    suffix: str
-
-    def __init__(self, suffix: str):
-        self.suffix = suffix
 
 
 class JobParams(BaseModel):
@@ -38,6 +33,15 @@ class ClusterJob(BaseModel):
     params: JobParams
     n_jobs: int = 0
     grouped: bool = False
+
+    @classmethod
+    def from_yaml_file(cls: type[Self], path: Path) -> Self:
+        with open(path, "r") as fp:
+            return cls(**yaml.safe_load(fp))
+
+    @classmethod
+    def from_yaml_str(cls: type[Self], s: str) -> Self:
+        return cls(**yaml.safe_load(s))
 
     @model_validator(mode="after")
     def validate_params(self) -> Self:
