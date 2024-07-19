@@ -7,9 +7,11 @@ import yaml
 
 class ImplicitOut:
     suffix: str
+    idx: int | None
 
-    def __init__(self, suffix: str):
+    def __init__(self, suffix: str, idx: int | None = None):
         self.suffix = suffix
+        self.idx = idx
 
 
 def parse_num(v: str) -> int | float | str:
@@ -96,9 +98,17 @@ def yaml_flatten(
 
 def yaml_implicit_out(loader: yaml.Loader, node: yaml.MappingNode) -> ImplicitOut:
     raw = node.value.split()
-    if len(raw) > 1:
-        raise ValueError(f"!implicit_out: expect 1 arguments, got {raw}")
-    return ImplicitOut(raw[0])
+    match len(raw):
+        case 1:
+            return ImplicitOut(raw[0])
+        case 2:
+            try:
+                idx = int(raw[1])
+                return ImplicitOut(raw[0], idx)
+            except ValueError as e:
+                raise ValueError("!implicit out: expect idx to be an integer") from e
+        case _:
+            raise ValueError(f"!implicit_out: expect 1 or 2 arguments, got {raw}")
 
 
 def yaml_file_range(loader: yaml.Loader, node: yaml.MappingNode) -> list[str]:

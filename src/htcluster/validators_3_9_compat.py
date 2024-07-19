@@ -37,7 +37,7 @@ class JobSettings(BaseModel):
 
 
 class JobArgs(BaseModel):
-    in_files: Optional[Path] = None
+    in_files: Optional[Path] | Optional[list[Path]] = None
     out_files: Optional[Path] = None
     params: Optional[dict] = None
 
@@ -48,12 +48,12 @@ class RunnerPayload(BaseModel):
     out_dir: Path
     log_dir: Path
     params: list[JobArgs]
-    in_files: list[Path] = []
+    in_files: list[Path] | list[list[Path]] = []
     out_files: list[Path] = []
-    in_files_staging: list[str] = []
+    in_files_staging: list[str] | list[list[str]] = []
     out_files_staging: list[str] = []
 
-    def get_in_file(self, idx: int) -> Union[Path, str]:
+    def get_in_file(self, idx: int) -> Union[Path, str, list[Path], list[str]]:
         if self.job.in_staging:
             return self.in_files_staging[idx]
         return self.in_files[idx]
@@ -63,8 +63,8 @@ class RunnerPayload(BaseModel):
             return self.out_files_staging[idx]
         return self.out_files[idx]
 
-    def has_inputs(self):
+    def has_inputs(self) -> bool:
         return (len(self.in_files) > 0) or (len(self.in_files_staging) > 0)
 
-    def has_outputs(self):
+    def has_outputs(self) -> bool:
         return (len(self.out_files) > 0) or (len(self.out_files_staging) > 0)

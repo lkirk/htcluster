@@ -44,8 +44,16 @@ def get_implicit_out_files(cj: ClusterJob) -> list[Path]:
     assert isinstance(cj.params.out_files, ImplicitOut)  # mypy
     suffix = cj.params.out_files.suffix
     for j in range(cj.n_jobs):
-        if len(cj.params.in_files) > 0:
-            out_files.append(get_implicit_out(cj.params.in_files[j].name, suffix))
+        if cj.params.has_inputs():
+            match cj.params.has_inputs():
+                case list():
+                    out_files.append(
+                        get_implicit_out(cj.params.in_files[j].name, suffix)
+                    )
+                case Path():
+                    out_files.append(
+                        get_implicit_out(cj.params.in_files[j].name, suffix)
+                    )
         else:
             out_files.append(get_implicit_out(j, suffix))
     return out_files
