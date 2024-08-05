@@ -1,7 +1,13 @@
+import warnings
 from pathlib import Path
 
 import structlog
-from paramiko import SFTPClient, SSHClient
+from cryptography.utils import CryptographyDeprecationWarning
+
+# TODO: remove when this is resolved
+with warnings.catch_warnings(action="ignore", category=CryptographyDeprecationWarning):
+    from paramiko import SFTPClient, SSHClient
+
 
 LOG = structlog.get_logger()
 

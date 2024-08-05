@@ -1,7 +1,12 @@
 import gzip
+import warnings
 
 import zmq
-import zmq.ssh
+from cryptography.utils import CryptographyDeprecationWarning
+
+# TODO: remove when this is resolved
+with warnings.catch_warnings(action="ignore", category=CryptographyDeprecationWarning):
+    import zmq.ssh
 
 from htcluster.validators_3_9_compat import RunnerPayload
 
