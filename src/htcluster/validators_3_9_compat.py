@@ -6,7 +6,7 @@ with python 3.9
 
 import re
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from pydantic import field_validator
 
@@ -39,7 +39,7 @@ class JobSettings(BaseModel):
 class JobArgs(BaseModel):
     in_files: Optional[Path] = None
     out_files: Optional[Path] = None
-    params: Optional[dict] = None
+    params: Optional[dict[str, Any]] = None
 
 
 class RunnerPayload(BaseModel):
