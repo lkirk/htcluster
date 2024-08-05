@@ -43,7 +43,7 @@ def get_implicit_out_files(cj: ClusterJob) -> list[Path]:
     out_files = []
     assert isinstance(cj.params.out_files, ImplicitOut)  # mypy
     suffix = cj.params.out_files.suffix
-    for j in range(cj.n_jobs):
+    for j in range(cj.params.n_jobs):
         if len(cj.params.in_files) > 0:
             out_files.append(get_implicit_out(cj.params.in_files[j].name, suffix))
         else:
@@ -91,7 +91,7 @@ def get_runner_payload(
                 else None
             ),
         )
-        for j in range(cj.n_jobs)
+        for j in range(cj.params.n_jobs)
     ]
 
     in_files, out_files, in_files_staging, out_files_staging = [], [], [], []
