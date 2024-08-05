@@ -279,7 +279,7 @@ def load_job_yaml(job_yaml: Path | str) -> ClusterJob:
 
 
 def run_cluster_job(
-    job_yaml: Path | str, dry_run=False, test_local=False
+    job_yaml: Path | str, dry_run=False, test_local=False, one_job=False
 ) -> SubmissionData:
     """
     Main entrypoint for running jobs.
@@ -295,6 +295,7 @@ def run_cluster_job(
     :param job_yaml: Path to yaml file or a valid yaml string
     :param dry_run: Print actions that would be performed
     :param test_local: Submit jobs to a local test server
+    :param one_job: Print the JobArgs for the first job
     :returns: Parsed and transformed submission data
 
     """
@@ -309,29 +310,47 @@ def run_cluster_job(
     else:
         copy_files_prep_dirs(sub_data, config, dry_run=True)
         send_submission_data(sub_data, config, test_local=test_local, dry_run=True)
-        print(sub_data.payload.model_dump_json(indent=2))
+        if one_job:
+            print(sub_data.payload.params[0].model_dump_json(indent=2))
+        else:
+            print(sub_data.payload.model_dump_json(indent=2))
 
     return sub_data
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("job_yaml", type=Path, help="input job description yaml")
+    parser.add_argument("job_yaml", type=Path, help="input job description yaml.")
     parser.add_argument(
         "--dry-run",
         "-d",
         action="store_true",
-        help="do not perform any actions, just gather data and validate inputs",
+        help="do not perform any actions, just gather data and validate inputs.",
+    )
+    parser.add_argument(
+        "--one-job",
+        action="store_true",
+        help=(
+            "to be used with --dry-run; print JobArgs for the first job, for testing "
+            "the job wrapper locally."
+        ),
     )
     parser.add_argument(
         "--test-local",
         action="store_true",
-        help="test against a local server instance, do not use ssh",
+        help=(
+            "to be used with --dry-run; test against a local server instance, do "
+            "not use ssh."
+        ),
     )
     args = parser.parse_args()
     if (not args.dry_run) and args.test_local:
         parser.error(
             "--dry-run is not specified, but --test-local is. specify --dry-run.",
+        )
+    if (not args.dry_run) and args.one_job:
+        parser.error(
+            "--dry-run is not specified, but --one-job is. specify --dry-run.",
         )
     return args
 
@@ -345,7 +364,7 @@ def main():
     if not args.job_yaml.exists() and args.job_yaml.is_file():
         raise ValueError(f"{args.job_yaml} does not exist")
 
-    run_cluster_job(args.job_yaml, args.dry_run, args.test_local)
+    run_cluster_job(args.job_yaml, args.dry_run, args.test_local, args.one_job)
 
 
 if __name__ == "__main__":
