@@ -15,7 +15,7 @@ from htcluster.validators import ClusterJob, ImplicitOut, JobSettings
 from htcluster.validators_3_9_compat import JobArgs, RunnerPayload
 
 from .github import get_most_recent_container_hash
-from .ssh import chtc_ssh_client, copy_file_sftp, mkdir_sftp
+from .ssh import chtc_ssh_client, copy_file_sftp, mkdir_sftp, write_file_sftp
 
 log_config()
 LOG = structlog.get_logger()
@@ -172,6 +172,10 @@ def print_copy_file(client: None, src: Path, dest: Path) -> None:
     print(f"copy {src} -> {dest}", file=sys.stderr)
 
 
+def print_write_file(client: None, dest: Path, data: str) -> None:
+    print(f"write {dest}", file=sys.stderr)
+
+
 def copy_files_prep_dirs(sub: SubmissionData, config: Config, dry_run: bool) -> None:
     """
     Using the paramiko sftp client, make all of the required output directories
@@ -186,6 +190,7 @@ def copy_files_prep_dirs(sub: SubmissionData, config: Config, dry_run: bool) -> 
         client = MockSshClient()
         mkdir = print_mkdir
         copy_file = print_copy_file
+        write_file = print_write_file
     else:
         LOG.info(
             "connecting via ssh to remote server",
@@ -195,12 +200,18 @@ def copy_files_prep_dirs(sub: SubmissionData, config: Config, dry_run: bool) -> 
         client = chtc_ssh_client(config.ssh_remote_user, config.ssh_remote_server)
         mkdir = mkdir_sftp
         copy_file = copy_file_sftp
+        write_file = write_file_sftp
 
     with client.open_sftp() as sftp:
         if sub.staging_dir:
             mkdir(sftp, sub.staging_dir)  # type: ignore
         for d in sub.remote_dirs:
             mkdir(sftp, d)  # type: ignore
+        write_file(
+            sftp,  # type: ignore
+            sub.payload.job_dir / "params.json",
+            sub.payload.model_dump_json(indent=2),
+        )
         for j, params in enumerate(sub.payload.params):
             if params.in_files and sub.cj.params.in_files:
                 copy_file(
