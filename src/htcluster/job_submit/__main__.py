@@ -279,7 +279,7 @@ def load_job_yaml(job_yaml: Path | str) -> ClusterJob:
 
 
 def run_cluster_job(
-    job_yaml: Path | str, dry_run=False, test_local=False, one_job=False
+    job_yaml: Path | str, dry_run=False, test_local=False, one_job=False, do_print=True
 ) -> SubmissionData:
     """
     Main entrypoint for running jobs.
@@ -310,11 +310,14 @@ def run_cluster_job(
     else:
         copy_files_prep_dirs(sub_data, config, dry_run=True)
         send_submission_data(sub_data, config, test_local=test_local, dry_run=True)
-        if one_job:
-            print(sub_data.payload.params[0].model_dump_json(indent=2))
-        else:
-            print(sub_data.payload.model_dump_json(indent=2))
+        if do_print:
+            if one_job:
+                print(sub_data.payload.params[0].model_dump_json(indent=2))
+            else:
+                print(sub_data.payload.model_dump_json(indent=2))
 
+    if one_job:
+        return sub_data.payload.params[0]
     return sub_data
 
 
