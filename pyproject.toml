@@ -6,6 +6,7 @@ name = "htcluster"
 dependencies = [
     "pydantic",
     "structlog",
+    "pyyaml"
 ]
 dynamic = ["version"]
 
@@ -14,7 +15,6 @@ job_submit = [
     "numpy",
     "paramiko",
     "python-dateutil",
-    "pyyaml",
     "pyzmq",
     "requests",
 ]
@@ -23,6 +23,10 @@ job_exec = [
     "python-dateutil",
     "pyzmq",
 ]
+# docs = [
+#     "sphinx",
+#     "sphinx-rtd-theme"
+# ]
 dev = ["ipython"]
 # unfortunately we can't reference the other groups
 all = [
@@ -34,6 +38,8 @@ all = [
     "pyyaml",
     "pyzmq",
     "requests",
+    # "sphinx",
+    # "sphinx-rtd-theme"
 ]
 
 [project.scripts]
