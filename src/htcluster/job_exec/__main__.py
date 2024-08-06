@@ -178,9 +178,12 @@ def serve_forever(
                 submission.issue_credentials()
 
                 schedd = htcondor.Schedd()
-                result = schedd.submit(submission, itemdata=iter(itemdata))
-                db.write_submission_data(job_db, result, m)
-                LOG.info("wrote job data to db")
+                try:
+                    result = schedd.submit(submission, itemdata=iter(itemdata))
+                    db.write_submission_data(job_db, result, m)
+                    LOG.info("wrote job data to db")
+                except Exception as e:
+                    LOG.exception(e)
             else:
                 LOG.info("printing data", itemdata=str(itemdata)[0:1024])
 
@@ -191,6 +194,7 @@ def main():
     if args.json_logging:
         structlog.configure(
             processors=[
+                structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S", utc=False),
                 structlog.processors.dict_tracebacks,
                 structlog.processors.JSONRenderer(),
             ]
