@@ -99,6 +99,13 @@ def connect(db: Path) -> sqlite3.Connection:
     return con
 
 
+def ad_or_None(classads, ad, t):
+    try:
+        return t(classads[ad])
+    except KeyError:
+        return None
+
+
 # TODO: can't type sub_result (htcondor2._submit_result.SubmitResult)
 def write_submission_data(
     con: sqlite3.Connection, submit_result, params: RunnerPayload
@@ -106,7 +113,7 @@ def write_submission_data(
     classads = submit_result.clusterad()
     submit_time = datetime.fromtimestamp(classads["QDate"]).astimezone(tz.tzlocal())
     local_timezone = tz.tzlocal().tzname(datetime.now())
-    job_classads = [t(classads[ad]) for ad, t in ADS]
+    job_classads = [ad_or_None(classads, ad, t) for ad, t in ADS]
     jobs = (
         submit_result.cluster(),
         submit_result.num_procs(),
