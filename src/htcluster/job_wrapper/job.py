@@ -10,6 +10,7 @@ def job_wrapper(schema):
 
     Usage:
 
+    .. code-block:: python
     @job_wrapper(MySchema)
     def main(args: MySchema) -> None:
         ...
