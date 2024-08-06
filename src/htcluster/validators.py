@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Self, TypeAlias
+from typing import Self
 
 from pydantic import ConfigDict, field_validator, model_validator
 
@@ -9,8 +9,8 @@ from .validator_base import BaseModel
 from .validators_3_9_compat import JobSettings
 
 # nested types are fine, validation on the workflow side handles this
-ParamType: TypeAlias = str | int | float | list | dict
-ParamCollection: TypeAlias = list[ParamType | dict[str, ParamType]]
+type ParamType = str | int | float | list | dict
+type ParamCollection = list[ParamType | dict[str, ParamType]]
 
 
 class JobParams(BaseModel):
