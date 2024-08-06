@@ -154,6 +154,28 @@ def yaml_zip(loader: yaml.Loader, node: yaml.SequenceNode) -> list[list]:
     return list(map(list, zip(*params)))
 
 
+def yaml_zip_named(loader: yaml.Loader, node: yaml.MappingNode) -> list[dict]:
+    args = construct_mapping_with_required_args(loader, node, {"args", "names"})
+    if not isinstance(args["args"], list):
+        raise ValueError(
+            f"!zip_named: 'args' argument must be a list, got {type(args['args'])}"
+        )
+    # TODO: validation could be better
+    if len(args["args"]) != len(args["names"]):
+        raise ValueError(
+            "!zip_named: expect as many names as args, got "
+            f"{len(args['args'])} and {len(args['names'])}"
+        )
+    first_len = len(args["args"][0])
+    for l in args["args"]:
+        if len(l) != first_len:
+            raise ValueError(
+                "!zip_named: expect all arguments to be of the same length, first element "
+                f"is of length {first_len}, {l} is of length {len(l)}"
+            )
+    return [dict(zip(args["names"], v)) for v in zip(*args["args"])]
+
+
 def yaml_merge(loader: yaml.Loader, node: yaml.SequenceNode) -> dict:
     params = loader.construct_sequence(node, deep=True)
     out = dict()
@@ -162,6 +184,17 @@ def yaml_merge(loader: yaml.Loader, node: yaml.SequenceNode) -> dict:
             raise ValueError(f"!merge: all arguments must be dict, got {p}")
         out = {**out, **p}
     return out
+
+
+def yaml_split(loader: yaml.Loader, node: yaml.MappingNode) -> list[list]:
+    args = construct_mapping_with_required_args(loader, node, {"arr", "n"})
+    if not isinstance(args["arr"], list):
+        raise ValueError(
+            f"!split: 'arr' argument must be a list, got {type(args['arr'])}"
+        )
+    if not len(args["arr"]) // args["n"]:
+        raise ValueError(f"!split: 'arr' does not split into {args['n']} chunks")
+    return [a.tolist() for a in np.array_split(args["arr"], args["n"])]
 
 
 yaml.SafeLoader.add_constructor("!randint_32", yaml_randint_32)
@@ -176,4 +209,6 @@ yaml.SafeLoader.add_constructor("!product_transposed", yaml_product_transposed)
 yaml.SafeLoader.add_constructor("!implicit_out", yaml_implicit_out)
 yaml.SafeLoader.add_constructor("!file_range", yaml_file_range)
 yaml.SafeLoader.add_constructor("!zip", yaml_zip)
+yaml.SafeLoader.add_constructor("!zip_named", yaml_zip_named)
 yaml.SafeLoader.add_constructor("!merge", yaml_merge)
+yaml.SafeLoader.add_constructor("!split", yaml_split)
