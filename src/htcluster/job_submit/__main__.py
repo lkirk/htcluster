@@ -279,8 +279,13 @@ def load_job_yaml(job_yaml: Path | str) -> ClusterJob:
 
 
 def run_cluster_job(
-    job_yaml: Path | str, dry_run=False, test_local=False, one_job=False, do_print=True
-) -> SubmissionData:
+    job_yaml: Path | str,
+    dry_run=False,
+    test_local=False,
+    one_job=False,
+    pick_job=False,
+    do_print=True,
+) -> JobArgs | SubmissionData:
     """
     Main entrypoint for running jobs.
 
@@ -312,12 +317,12 @@ def run_cluster_job(
         send_submission_data(sub_data, config, test_local=test_local, dry_run=True)
         if do_print:
             if one_job:
-                print(sub_data.payload.params[0].model_dump_json(indent=2))
+                print(sub_data.payload.params[pick_job or 0].model_dump_json(indent=2))
             else:
                 print(sub_data.payload.model_dump_json(indent=2))
 
     if one_job:
-        return sub_data.payload.params[0]
+        return sub_data.payload.params[pick_job or 0]
     return sub_data
 
 
@@ -339,6 +344,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--pick-job",
+        type=int,
+        help=(
+            "pick job to be run with --one-job "
+            "(--dry-run and --one-job must be specified)."
+        ),
+    )
+    parser.add_argument(
         "--test-local",
         action="store_true",
         help=(
@@ -355,6 +368,10 @@ def parse_args() -> argparse.Namespace:
         parser.error(
             "--dry-run is not specified, but --one-job is. specify --dry-run.",
         )
+    if (not args.one_job) and args.pick_job:
+        parser.error(
+            "--one-job is not specified, but --pick-job is. specify --one-job.",
+        )
     return args
 
 
@@ -367,7 +384,9 @@ def main():
     if not args.job_yaml.exists() and args.job_yaml.is_file():
         raise ValueError(f"{args.job_yaml} does not exist")
 
-    run_cluster_job(args.job_yaml, args.dry_run, args.test_local, args.one_job)
+    run_cluster_job(
+        args.job_yaml, args.dry_run, args.test_local, args.one_job, args.pick_job
+    )
 
 
 if __name__ == "__main__":
