@@ -30,7 +30,7 @@ job_exec = [
 dev = ["ipython"]
 # unfortunately we can't reference the other groups
 all = [
-    "htcondor",
+    "htcondor==23.10.0rc1",
     "ipython",
     "numpy",
     "paramiko",
