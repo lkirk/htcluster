@@ -1,22 +1,13 @@
-import sys
-
-# import from cluster htcondor build if we can
-sys.path.insert(0, "/usr/lib64/python3.9/site-packages")
-
-try:
-    import htcondor2 as htcondor
-except ModuleNotFoundError:
-    # the htcondor wheel is broken for classad2
-    from htcondor import htcondor
-
 import argparse
 import gzip
 import signal
 import sqlite3
+import sys
 from pathlib import Path
 from types import FrameType
 from typing import Any, Optional
 
+import htcondor2 as htcondor
 import structlog
 import zmq
 from pydantic import ValidationError
