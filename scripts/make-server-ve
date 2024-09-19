@@ -1,5 +1,6 @@
 #!/bin/bash
 
+[[ -d ~/.venv/htcluster ]] && (echo removing existing env; rm -r ~/.venv/htcluster)
 python -m venv ~/.venv/htcluster
 source ~/.venv/htcluster/bin/activate
 pip install -U pip setuptools
