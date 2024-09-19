@@ -35,7 +35,6 @@ all = [
     "numpy",
     "paramiko",
     "python-dateutil",
-    "pyyaml",
     "pyzmq",
     "requests",
     # "sphinx",
