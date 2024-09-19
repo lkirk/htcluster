@@ -72,7 +72,6 @@ def make_submission(
     itemdata = []
     sub = {
         "universe": "docker",
-        "docker_pull_policy": "always",
         "initialdir": Path("~").expanduser() / payload.job_dir,
         "JobBatchName": payload.job.name,
         "docker_image": payload.job.docker_image,
@@ -84,6 +83,9 @@ def make_submission(
         "error": payload.log_dir / "err/$(Process).log",
         "log": payload.log_dir / "cluster.log",
     }
+    if payload.job.additional_args is not None:
+        for arg_name, arg in payload.job.additional_args.items():
+            sub[arg_name] = arg
 
     classads = payload.job.classads
     if payload.job.in_staging or payload.job.out_staging:

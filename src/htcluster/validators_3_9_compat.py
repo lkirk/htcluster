@@ -25,6 +25,7 @@ class JobSettings(BaseModel):
     classads: str = ""
     in_staging: bool = False
     out_staging: bool = False
+    additional_args: Optional[dict[str, Any]] = dict()  # additional job parameters
 
     @field_validator("disk", "memory")
     @classmethod
