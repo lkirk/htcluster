@@ -7,7 +7,7 @@ from pathlib import Path
 from types import FrameType
 from typing import Any, Optional
 
-import htcondor2 as htcondor
+import htcondor
 import structlog
 import zmq
 from pydantic import ValidationError
