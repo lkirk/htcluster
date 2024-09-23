@@ -168,8 +168,6 @@ def serve_forever(
             LOG.info(f"submitting {sub}")
             if dry_run is False:
                 submission = htcondor.Submit(sub)
-                submission.issue_credentials()
-
                 schedd = htcondor.Schedd()
                 try:
                     result = schedd.submit(submission, itemdata=iter(itemdata))
