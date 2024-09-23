@@ -167,9 +167,9 @@ def serve_forever(
 
             LOG.info(f"submitting {sub}")
             if dry_run is False:
-                submission = htcondor.Submit(sub)
-                schedd = htcondor.Schedd()
                 try:
+                    submission = htcondor.Submit(sub)
+                    schedd = htcondor.Schedd()
                     result = schedd.submit(submission, itemdata=iter(itemdata))
                     db.write_submission_data(job_db, result, m)
                     LOG.info("wrote job data to db")
