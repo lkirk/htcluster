@@ -8,6 +8,7 @@ from types import FrameType
 from typing import Any, Optional
 
 import htcondor
+import htcondor2
 import structlog
 import zmq
 from pydantic import ValidationError
@@ -169,6 +170,7 @@ def serve_forever(
             if dry_run is False:
                 try:
                     submission = htcondor.Submit(sub)
+                    htcondor2.Submit().issue_credentials()
                     schedd = htcondor.Schedd()
                     result = schedd.submit(submission, itemdata=iter(itemdata))
                     db.write_submission_data(job_db, result, m)
