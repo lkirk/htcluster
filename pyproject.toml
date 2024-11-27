@@ -19,7 +19,7 @@ job_submit = [
     "requests",
 ]
 job_exec = [
-    "htcondor==23.10.0rc1",
+    "htcondor==24.2.1",
     "python-dateutil",
     "pyzmq",
 ]
